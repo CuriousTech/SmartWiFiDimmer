@@ -51,9 +51,9 @@ int serverPort = 80;                    // listen port
 #define UNUSED_5   5  // open
 #define UNUSED_12 12  // open
 #define UNUSED_13 13  // open
-#define WIFI_LED  14  // top green LED
+#define WIFI_LED  14  // top green LED (on high)
 #define UNUSED_15 15  // 1K pulldown
-#define UNUSED_16 16  // open (no internal pullup)
+#define MOTION    16  // RCW-0516 (no internal pullup)
 
 IPAddress lastIP;     // last IP that accessed the device
 int nWrongPass;       // wrong password block counter
@@ -64,12 +64,12 @@ uint16_t nSecTimer; // off timer
 uint16_t nDelayOn;  // delay on timer
 uint8_t nSched;     // current schedule
 uint8_t nBlinkLED1; // 1 sec blink counter
-bool  bOverride;    // automatic override of schedule
-uint8_t nIgnore;     // for motion sensor
-bool  bWsConnected;
-bool  bLightOn;      // state
+bool    bOverride;    // automatic override of schedule
+uint8_t nWsConnected;
+bool    bLightOn;      // state
 uint8_t nLightLevel; // current level
 uint8_t nNewLightLevel; // set in a callback
+bool    bEnMot = true; // enable motion by default
 
 WiFiManager wifi;  // AP page:  192.168.4.1
 AsyncWebServer server( serverPort );
@@ -91,10 +91,11 @@ String dataJson()
 {
   String s = "state;{\"t\":";
   s += now() - ( (ee.tz + utime.getDST() ) * 3600);
+  s += ",\"name\":\"";  s += ee.szName; s += "\"";
   s += ",\"on\":";  s += bLightOn;
   s += ",\"l1\":";  s += digitalRead(WIFI_LED);
   s += ",\"lvl\":";  s += nLightLevel;
-  s += ",\"mo\":";  s += 0;//digitalRead(MOTION);
+  s += ",\"mo\":";  s += digitalRead(MOTION);
   s += ",\"tr\":";  s += nSecTimer;
   s += ",\"sn\":";  s += nSched;
   s += "}";
@@ -187,6 +188,8 @@ void parseParams(AsyncWebServerRequest *request)
           s.toCharArray(ee.szName, sizeof(ee.szName));
         else
           strcpy(ee.szName, "Dimmer");
+        eemem.update();
+        ESP.reset();
         break;
       case 'a': // autoTimer
         ee.autoTimer = s.toInt();
@@ -219,11 +222,12 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       }
       client->text(dataJson());
       client->ping();
-      bWsConnected = true;
+      nWsConnected++;
       break;
     case WS_EVT_DISCONNECT:    //client disconnected
       compactSched();
-      bWsConnected = false;
+      if(nWsConnected)
+        nWsConnected--;
       break;
     case WS_EVT_ERROR:    //error was received from the other end
       break;
@@ -354,7 +358,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
 
 void CallHost(reportReason r)
 {
-  if(ee.hostIP[0] == 0 || bWsConnected || ee.bCall == false) // no host set or already monitored
+  if(ee.hostIP[0] == 0 || ee.bCall == false) // no host set
     return;
 
   String sUri = String("/wifi?name=\"");
@@ -387,7 +391,8 @@ uint8_t ssCnt = 58;
 
 void sendState()
 {
-  ws.textAll( dataJson() );
+  if(nWsConnected)
+    ws.textAll( dataJson() );
   ssCnt = 58;
 }
 
@@ -467,7 +472,7 @@ void checkSerial()
 // 0 = req status (len=0)
 // 1 = req key (len=0)
 // 2 = req ? (len=0)
-// 6 = set dimmer (len=5 or 8)
+// 6 = set dimmer (len:5=on/off or 8=level)
 // 8 = req full ? (len=0)
 
 void setSwitch(bool bOn)
@@ -479,9 +484,6 @@ void setSwitch(bool bOn)
   data[3] = 1;
   data[4] = bOn;
   writeSerial(6, data, 5);
-
-  nIgnore = 2; // ignore the false motion
-  bLightOn = bOn;
 }
 
 void setLevel()
@@ -505,7 +507,7 @@ bool writeSerial(uint8_t cmd, uint8_t *p, uint8_t len)
   buf[0] = 0x55;
   buf[1] = 0xAA;
   buf[2] = 0;
-  buf[3] = cmd;
+  buf[3] = cmd; // big endien
   buf[4] = 0;
   buf[5] = len;
 
@@ -538,8 +540,6 @@ void setup()
   pinMode(WIFI_LED, OUTPUT);
 
   Serial.begin(9600);
-//  Serial.println('Start');
-//    Serial.println('Start');
   checkStatus();
   WiFi.hostname(ee.szName);
   wifi.autoConnect(ee.szName, ee.controlPassword); // Tries config AP, then starts softAP mode for config
@@ -601,6 +601,7 @@ void setup()
     s += ",\"mot\":";  s += ee.nMotionSecs;
     s += ",\"ch\":";   s += ee.bCall;
     s += ",\"auto\":";  s += ee.autoTimer;
+//    s += ",\"ee\":";  s += sizeof(ee);
     s += "}";
 
     request->send(200, "text/json", s);
@@ -625,7 +626,7 @@ void setup()
   ArduinoOTA.begin();
   ArduinoOTA.onStart([]() {
     eemem.update();
-    digitalWrite(WIFI_LED, HIGH); // set it all to off
+    digitalWrite(WIFI_LED, LOW); // set it all to off
     setSwitch(false);
   });
 #endif
@@ -653,22 +654,24 @@ void loop()
   checkSerial();
 
   static uint8_t nOldLevel;
-  if(nLightLevel != nOldLevel)
-  {
-    nOldLevel = nLightLevel;
-    sendState();
-    CallHost(Reason_Level);
-  }
-
-  if(nNewLightLevel != nLightLevel)
+  static bool bOldOn;
+  if(nNewLightLevel != nLightLevel) // new requested level
   {
     nLightLevel = nNewLightLevel;
     setLevel();
+  }
+
+  uint32_t tm;
+
+  if(nLightLevel != nOldLevel && !Serial.available() && (millis() - tm > 20) ) // new level from MCU & no new serial data
+  {
+    nOldLevel = nLightLevel;
+    tm = millis();
+    bOldOn = bLightOn; // reduce calls
     sendState();
     CallHost(Reason_Level);
   }
 
-  static bool bOldOn;
   if(bLightOn != bOldOn)
   {
     bOldOn = bLightOn;
@@ -681,18 +684,17 @@ void loop()
       nSecTimer = ee.autoTimer;
   }
 
-/*
   bool bMot = digitalRead(MOTION);
   if(bMot != bMotion)
   {
     bMotion = bMot;
-    if(bMot && nIgnore==0) // got motion
+    if(bMot) // got motion
     { // timing enabled   currently off
-      if(ee.nMotionSecs)
+      if(ee.nMotionSecs && bEnMot)
       {
         if(nSecTimer < ee.nMotionSecs) // skip if schedule is active and higher
           nSecTimer = ee.nMotionSecs; // reset if on
-        if(digitalRead(RELAY) == LOW) // turn on
+        if(bLightOn == false) // turn on
         {
           setSwitch(true);
           if(ee.autoTimer)
@@ -700,12 +702,12 @@ void loop()
         }
       }
     }
-    if(nIgnore == 0 || bMot == false)
+    if(bMot == false)
       sendState();
-    if(nIgnore == 0 && bMot == true)
+    else
       CallHost(Reason_Motion);
   }
-*/
+
   if(sec_save != second()) // only do stuff once per second
   {
     sec_save = second();
@@ -727,8 +729,6 @@ void loop()
 
     if(nWrongPass)            // wrong password blocker
       nWrongPass--;
-
-    if(nIgnore) nIgnore--; // ignore relay caused falses
 
     if(--ssCnt == 0)
        sendState();
@@ -781,9 +781,14 @@ bool checkSched(bool bCheck) // Checks full schedule at the beginning of every m
     if((ee.schedule[i].wday&1) && (ee.schedule[i].wday & (1 << weekday()) ) && // enabled, current day selected
         timeNow >= start && timeNow < start + ee.schedule[i].seconds ) // within time
     {
+        if(ee.schedule[i].wday & E_M_On)
+          bEnMot = true;
+        if(ee.schedule[i].wday & E_M_Off)
+          bEnMot = false;
+
         nSecTimer = ee.schedule[i].seconds - (timeNow - start); // delay for time left
         nSched = i + 1; // 1 = entry 0
-        if(bOverride == false)
+        if(bOverride == false && ee.schedule[i].seconds && nSecTimer > 0)
         {
           if(ee.schedule[i].level)
             nNewLightLevel = ee.schedule[i].level;
