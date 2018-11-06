@@ -11,7 +11,7 @@ background-image: -o-linear-gradient(top, #ffffff, #50a0ff);
 background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
 background-image: linear-gradient(top, #ffffff, #50a0ff);
 background-clip: padding-box;}
-body{width:430px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
+body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
 </style>
 <script type="text/javascript" src="data"></script>
 <script type="text/javascript">
@@ -19,7 +19,7 @@ a=document.all
 idx=0
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.112/ws")
+//ws=new WebSocket("ws://192.168.0.114/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -92,7 +92,7 @@ function setData()
   {
    wks=document.getElementsByName('W'+it)
    w=0
-   for(wd=0;wd<8;wd++) if(wks[wd].checked) w|=(1<<wd)
+   for(wd=0;wd<10;wd++) if(wks[wd].checked) w|=(1<<wd)
    save=false
    if(item[it][0]!=document.getElementById('N'+it).value) save=true
    if(item[it][1]!=hms2t(document.getElementById('S'+it).value)) save=true
@@ -173,7 +173,7 @@ function AddEntry(arr)
   inp.value=arr[0]
   td.appendChild(inp)
 
-  for(i=0;i<8;i++){
+  for(i=0;i<10;i++){
 	inp=document.createElement("input")
 	inp.type='checkbox'
 	inp.name='W'+idx
@@ -191,15 +191,16 @@ function AddEntry(arr)
   inp=document.createElement("input")
   inp.id='T'+idx
   inp.type='text'
-  inp.value=t2hms(arr[2])
+  t=t2hms(arr[2])
+  inp.value=(t)?t:''
   inp.size=2
   td.appendChild(inp)
 
   inp=document.createElement("input")
   inp.id='L'+idx
   inp.type='text'
-  inp.value=arr[4]
-  inp.size=4
+  inp.value=arr[4]?arr[4]:''
+  inp.size=2
   td.appendChild(inp)
 
   tr=document.createElement("tr")
@@ -220,7 +221,7 @@ openSocket()
 fillData()
 }"
 >
-<table align="right" width="424">
+<table align="right" width="450">
 <tr><td>Light</td><td>LED &nbsp Report</td><td><div id="time"></div></td></tr>
 <tr><td><input name="RLY" value="OFF" type='button' onclick="{manual()}"></td>
 <td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="CH" value="OFF" type='button' onclick="{togCall()}"></td>
@@ -229,10 +230,10 @@ fillData()
 <td colspan="3"><label for="LVL">Level </label><input name="LVL" value="255" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min="0" max="255" onchange="slide();">  &nbsp
  &nbsp <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
 
-<tr><td>Name &nbsp </td><td colspan=2><small>En Su Mo Tu We Th Fr Sa</small>&nbsp Time &nbsp Duration Level</td></tr>
+<tr><td>Name &nbsp </td><td colspan=2><small>En Su Mo Tu We Th Fr Sa On Off</small>&nbsp Time &nbsp Duration Level</td></tr>
 </table>
 <table align="right" style="font-size:small" id="list"></table>
-<table align="right">
+<table align="right" width="450">
 <tr><td id="MOT">Motion</td><td><input name="mtime" type=text size=4 style="width: 60px"> &nbsp
  <input value='Save Changes' type=button onclick="setData();"> &nbsp </td><td> <input id="myKey" name="key" type=text size=50 placeholder="password" style="width: 128px">
 <input type="button" value="Set" onClick="{localStorage.setItem('key', key = document.all.myKey.value)}"></td></tr>
