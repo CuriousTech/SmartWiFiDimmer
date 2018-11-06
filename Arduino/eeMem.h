@@ -3,16 +3,30 @@
 
 #include <Arduino.h>
 
+enum Enable_bits
+{
+  E_Enable = 1,
+  E_Sun = 2,
+  E_Mon = 4,
+  E_Tue = 8,
+  E_Wed = 0x10,
+  E_Thu = 0x20,
+  E_Fri = 0x40,
+  E_Sat = 0x80,
+  E_M_On = 0x100,
+  E_M_Off = 0x200,
+};
+
 struct Sched          // User set schedule item
 {
   uint16_t timeSch;   // time of day in minutes
   uint16_t seconds;   // seconds on
-  uint8_t wday;       // weekday bits (0 = enabled, 1 = Sunday, 7 = Saturday)
+  uint16_t wday;      // weekday bits (0 = enabled, 1 = Sunday, 7 = Saturday)
   uint8_t level;      // brightness
   char    sname[20];  // entry name
-}; // 26 bytes aligned
+}; // 28 bytes aligned
 
-#define MAX_SCHED 46
+#define MAX_SCHED 50
 
 struct eeSet // EEPROM backed data
 {
@@ -30,9 +44,9 @@ struct eeSet // EEPROM backed data
   uint32_t autoTimer;
   uint16_t nMotionSecs;
   bool     bCall;        // use callHost
-  uint8_t  reserved;
-  Sched    schedule[MAX_SCHED];  // 46*28
-};
+  uint8_t  reserved; // 212
+  Sched    schedule[MAX_SCHED];  // 50*28
+}; // 1612
 
 extern eeSet ee;
 
