@@ -7,7 +7,7 @@ eeSet ee = {              // Defaults for blank EEPROM
   "",  // saved SSID
   "", // router password
   "0.us.pool.ntp.org", 2390, -5, // NTP server, udp port, TZ
-  "passsword", // device password for control
+  "password", // device password for control
   {192,168,0,100}, 83, // host IP and port
   "Dimmer",
   0, // autoTimer
