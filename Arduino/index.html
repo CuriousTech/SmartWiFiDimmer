@@ -19,11 +19,11 @@ a=document.all
 idx=0
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.114/ws")
+//ws=new WebSocket("ws://192.168.0.118/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
-//console.log(evt.data)
+console.log(evt.data)
  lines=evt.data.split(';')
  event=lines[0]
  data=lines[1]
@@ -38,6 +38,8 @@ ws.onmessage=function(evt){
 	a.LED1.setAttribute('style',d.l1?'color:green':'')
 	a.LVL.value=d.lvl
 	a.level.value=d.lvl
+	a.level.min=d.mn
+	a.level.max=d.mx
 	a.MOT.setAttribute('bgcolor',d.mo?'red':'')
 	if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')
  }
@@ -227,10 +229,10 @@ fillData()
 <td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="CH" value="OFF" type='button' onclick="{togCall()}"></td>
 <td><label for="auto">Auto Off </label><input name="auto" type="text" value="0" size="4"> &nbsp &nbsp <label for="TZ">TZ </label><input name="TZ" type=text size=1 value='-5'></td></tr>
 <tr>
-<td colspan="3"><label for="LVL">Level </label><input name="LVL" value="255" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min="0" max="255" onchange="slide();">  &nbsp
+<td colspan="3"><label for="LVL">Level </label><input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min="10" max="99" onchange="slide();">  &nbsp
  &nbsp <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
 
-<tr><td>Name &nbsp </td><td colspan=2><small>En Su Mo Tu We Th Fr Sa On Off</small>&nbsp Time &nbsp Duration Level</td></tr>
+<tr><td>Name &nbsp </td><td colspan=2><small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration Level</td></tr>
 </table>
 <table align="right" style="font-size:small" id="list"></table>
 <table align="right" width="450">
