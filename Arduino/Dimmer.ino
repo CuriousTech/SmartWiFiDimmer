@@ -25,7 +25,7 @@ SOFTWARE.
 
 //uncomment to enable Arduino IDE Over The Air update code
 #define OTA_ENABLE
-
+//#define MOTION
 #include <Wire.h>
 #include <EEPROM.h>
 #include <ESP8266mDNS.h>
@@ -39,21 +39,14 @@ SOFTWARE.
 #include <ArduinoOTA.h>
 #endif
 #include "pages.h"
+#include "control.h"
 #include <JsonParse.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonParse
 #include <JsonClient.h>
 
-int serverPort = 80;                    // listen port
-
-// RX TX dimmer
-#define UART1_CK   0  // 10K pullup, STM8S003 pin 1
 #define ESP_LED    2  // open (ESP-07 low = blue LED on)
-#define UNUSED_4   4  // open
-#define UNUSED_5   5  // open
-#define UNUSED_12 12  // open
-#define UNUSED_13 13  // open
-#define WIFI_LED  14  // top green LED (on high)
-#define UNUSED_15 15  // 1K pulldown
 #define MOTION    16  // RCW-0516 (no internal pullup)
+
+int serverPort = 80;                    // listen port
 
 IPAddress lastIP;     // last IP that accessed the device
 int nWrongPass;       // wrong password block counter
@@ -63,13 +56,9 @@ UdpTime utime;
 uint16_t nSecTimer; // off timer
 uint16_t nDelayOn;  // delay on timer
 uint8_t nSched;     // current schedule
-uint8_t nBlinkLED1; // 1 sec blink counter
 bool    bOverride;    // automatic override of schedule
 uint8_t nWsConnected;
-bool    bLightOn;      // state
-uint8_t nLightLevel; // current level
-uint8_t nNewLightLevel; // set in a callback
-bool    bEnMot = true; // enable motion by default
+bool    bEnMot = true;
 
 WiFiManager wifi;  // AP page:  192.168.4.1
 AsyncWebServer server( serverPort );
@@ -78,6 +67,8 @@ AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
 JsonParse jsonParse(jsonCallback);
 JsonClient jsonPush(jsonCallback);
+
+swControl cont;
 
 enum reportReason
 {
@@ -92,12 +83,16 @@ String dataJson()
   String s = "state;{\"t\":";
   s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"name\":\"";  s += ee.szName; s += "\"";
-  s += ",\"on\":";  s += bLightOn;
+  s += ",\"on\":";  s += cont.m_bLightOn;
   s += ",\"l1\":";  s += digitalRead(WIFI_LED);
-  s += ",\"lvl\":";  s += nLightLevel;
-  s += ",\"mo\":";  s += digitalRead(MOTION);
+  s += ",\"lvl\":";  s += cont.m_nLightLevel;
   s += ",\"tr\":";  s += nSecTimer;
   s += ",\"sn\":";  s += nSched;
+  s += ",\"mn\":";  s += cont.nLevelMin;
+  s += ",\"mx\":";  s += cont.nLevelMax;
+#ifdef MOTION
+  s += ",\"mo\":";  s += digitalRead(MOTION);
+#endif
   s += "}";
   return s;
 }
@@ -148,8 +143,6 @@ void parseParams(AsyncWebServerRequest *request)
 
   lastIP = ip;
 
-  nBlinkLED1 = 2;
-
   for ( uint8_t i = 0; i < request->params(); i++ ) {
     AsyncWebParameter* p = request->getParam(i);
     p->value().toCharArray(temp, 100);
@@ -166,13 +159,13 @@ void parseParams(AsyncWebServerRequest *request)
         break;
       case 'o': // light on/off
         if(nSched) bOverride = !bValue;
-        setSwitch(bValue);
+        cont.setSwitch(bValue);
         if(bValue && ee.autoTimer)
           nSecTimer = ee.autoTimer;
         break;
       case 'l': // level
         if(nSched) bOverride = (s.toInt() == 0);
-        nNewLightLevel = s.toInt();
+        cont.setLevel( s.toInt() );
         if(s.toInt() && ee.autoTimer)
           nSecTimer = ee.autoTimer;
         break;
@@ -180,7 +173,7 @@ void parseParams(AsyncWebServerRequest *request)
         ee.bCall = bValue;
         break;
       case 'd': // delay off
-        if(bLightOn)
+        if(cont.m_bLightOn)
           nSecTimer = s.toInt();
         break;
       case 'n':
@@ -291,7 +284,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 1: // on
           nSecTimer = 0;
-          setSwitch(iValue);
+          cont.setSwitch(iValue);
           if(nSched) bOverride = !iValue;
           if(iValue && ee.autoTimer)
             nSecTimer = ee.autoTimer;
@@ -309,10 +302,10 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           // schedule a time
           break;
         case 6: // led1
-          digitalWrite(WIFI_LED, iValue);
+          cont.setLED(iValue);
           break;
         case 7: // lvl
-          nNewLightLevel = iValue;
+          cont.setLevel(iValue);
           break;
         case 8: // TZ
           ee.tz = iValue;
@@ -368,16 +361,16 @@ void CallHost(reportReason r)
   switch(r)
   {
     case Reason_Setup:
-      sUri += "\"setup\"&port="; sUri += serverPort;
-      break;
-    case Reason_Motion:
-      sUri += "\"motion\"";
+      sUri += "setup&port="; sUri += serverPort;
       break;
     case Reason_Switch:
-      sUri += "\"switch\"&on="; sUri += bLightOn;
+      sUri += "switch&on="; sUri += cont.m_bLightOn;
       break;
     case Reason_Level:
-      sUri += "\"level\"&value="; sUri += nLightLevel;
+      sUri += "level&value="; sUri += cont.m_nLightLevel;
+      break;
+    case Reason_Motion:
+      sUri += "motion";
       break;
   }
   
@@ -396,162 +389,16 @@ void sendState()
   ssCnt = 58;
 }
 
-void checkSerial()
-{
-  static uint8_t inBuffer[32];
-  static uint8_t idx;
-  static uint8_t state;
-  static uint16_t cmd;
-  static uint16_t len;
-
-  while(Serial.available())
-  {
-    uint8_t c = Serial.read();
-    switch(state)
-    {
-      case 0:     // data packet: 55 AA 00 cmd 00 len d0 d1 d2.... chk
-        if(c == 0x55)
-          state = 1;
-        break;
-      case 1:
-        if(c == 0xAA)
-          state = 2;
-        break;
-      case 2:
-        cmd = (uint16_t)c<<8;
-        state = 3;
-        break;
-      case 3:
-        cmd |= (uint16_t)c;
-        state = 4;
-        break;
-      case 4:
-        len = (uint16_t)c<<8;
-        state = 5;
-        break;
-      case 5:
-        len |= (uint16_t)c;
-        state = 6;
-        idx = 0;
-        break;
-      case 6:
-        inBuffer[idx++] = c; // get length + checksum
-        if(idx > len || idx >= sizeof(inBuffer) )
-        {
-          switch(cmd)
-          {
-            case 0: // main data (1 byte) 0 or 1
-              break;
-            case 1: // key (21 bytes)
-              break;
-            case 2: //  (2 bytes) 0E 00
-              break;
-            case 7: // light level
-              switch(len)
-              {
-                case 5: // 01 00 01 00 01 01
-                  bLightOn = inBuffer[5];
-                  break;
-                case 8: // 02 02 00 04 00 ?? 00 93
-                  nNewLightLevel = nLightLevel = inBuffer[7];
-                  bLightOn = (nLightLevel) ? true:false;
-                  break;
-              }
-              break;
-          }
-          
-          state = 0;
-          idx = 0;
-          len = 0;
-        }
-        break;
-    }
-  }
-}
-
-// 0 = req status (len=0)
-// 1 = req key (len=0)
-// 2 = req ? (len=0)
-// 6 = set dimmer (len:5=on/off or 8=level)
-// 8 = req full ? (len=0)
-
-void setSwitch(bool bOn)
-{
-  uint8_t data[5];// = {1,1,0,1,bOn};
-  data[0] = 1;
-  data[1] = 1;
-  data[2] = 0;
-  data[3] = 1;
-  data[4] = bOn;
-  writeSerial(6, data, 5);
-}
-
-void setLevel()
-{
-  uint8_t data[8];// = {2,2,0,4,0,0,0,nLightLevel};
-  data[0] = 2;
-  data[1] = 2;
-  data[2] = 0;
-  data[3] = 4; // probably ramp
-  data[4] = 0;
-  data[5] = 0; // not sure
-  data[6] = 0;
-  data[7] = nLightLevel;
-  writeSerial(6, data, 8);
-}
-
-bool writeSerial(uint8_t cmd, uint8_t *p, uint8_t len)
-{
-  uint8_t buf[16] = {0};
-
-  buf[0] = 0x55;
-  buf[1] = 0xAA;
-  buf[2] = 0;
-  buf[3] = cmd; // big endien
-  buf[4] = 0;
-  buf[5] = len;
-
-  int i;
-  if(p) for(i = 0; i < len; i++)
-    buf[6 + i] = p[i];
-
-  uint16_t chk = 0;
-  for(i = 0; i < len + 6; i++)
-    chk += buf[i];
-  buf[6 + len] = (uint8_t)chk;
-  return Serial.write(buf, 7 + len);
-}
-
-uint8_t cs = 1;
-void checkStatus()
-{
-  writeSerial(0, NULL, 0);
-  cs = 15;
-}
-
-void checkLevel()
-{
-  writeSerial(8, NULL, 0);
-}
 
 void setup()
 {
-  digitalWrite(WIFI_LED, LOW);
-  pinMode(WIFI_LED, OUTPUT);
-
-  Serial.begin(9600);
-  checkStatus();
+  cont.init();
   WiFi.hostname(ee.szName);
   wifi.autoConnect(ee.szName, ee.controlPassword); // Tries config AP, then starts softAP mode for config
   if(wifi.isCfg() == false)
   {
     if ( !MDNS.begin ( ee.szName, WiFi.localIP() ) );
-//      Serial.println ( "MDNS responder failed" );
-//    Serial.println("");
-//    Serial.println("WiFi connected");
-//    Serial.println("IP address: ");
-//    Serial.println(WiFi.localIP());
-    digitalWrite(WIFI_LED, HIGH);
+    cont.setLED(true);
   }
   // attach AsyncWebSocket
   ws.onEvent(onWsEvent);
@@ -601,7 +448,6 @@ void setup()
     s += ",\"mot\":";  s += ee.nMotionSecs;
     s += ",\"ch\":";   s += ee.bCall;
     s += ",\"auto\":";  s += ee.autoTimer;
-//    s += ",\"ee\":";  s += sizeof(ee);
     s += "}";
 
     request->send(200, "text/json", s);
@@ -626,13 +472,12 @@ void setup()
   ArduinoOTA.begin();
   ArduinoOTA.onStart([]() {
     eemem.update();
-    digitalWrite(WIFI_LED, LOW); // set it all to off
-    setSwitch(false);
+    cont.setLED(false); // set it all to off
+    cont.setSwitch(false);
   });
 #endif
   if(wifi.isCfg() == false)
     utime.start();
-  setLevel();
   CallHost(Reason_Setup);
 }
 
@@ -650,40 +495,33 @@ void loop()
 
   if(!wifi.isCfg())
     utime.check(ee.tz);
-
-  checkSerial();
+  cont.listen();
 
   static uint8_t nOldLevel;
   static bool bOldOn;
-  if(nNewLightLevel != nLightLevel) // new requested level
+  static uint32_t tm;
+  if(cont.m_nLightLevel != nOldLevel && !Serial.available() && (millis() - tm > 120) ) // new level from MCU & no new serial data
   {
-    nLightLevel = nNewLightLevel;
-    setLevel();
-  }
-
-  uint32_t tm;
-
-  if(nLightLevel != nOldLevel && !Serial.available() && (millis() - tm > 20) ) // new level from MCU & no new serial data
-  {
-    nOldLevel = nLightLevel;
-    tm = millis();
-    bOldOn = bLightOn; // reduce calls
     sendState();
     CallHost(Reason_Level);
+    tm = millis();
+    bOldOn = cont.m_bLightOn; // reduce calls
+    nOldLevel = cont.m_nLightLevel;
   }
 
-  if(bLightOn != bOldOn)
+  if(cont.m_bLightOn != bOldOn)
   {
-    bOldOn = bLightOn;
+    bOldOn = cont.m_bLightOn;
     nSecTimer = 0;
     CallHost(Reason_Switch);
     sendState();
-    if(nSched && bLightOn)
-      bOverride = bLightOn;
-    if(bLightOn && ee.autoTimer)
+    if(nSched && cont.m_bLightOn)
+      bOverride = cont.m_bLightOn;
+    if(cont.m_bLightOn && ee.autoTimer)
       nSecTimer = ee.autoTimer;
   }
 
+#ifdef MOTION
   bool bMot = digitalRead(MOTION);
   if(bMot != bMotion)
   {
@@ -694,9 +532,9 @@ void loop()
       {
         if(nSecTimer < ee.nMotionSecs) // skip if schedule is active and higher
           nSecTimer = ee.nMotionSecs; // reset if on
-        if(bLightOn == false) // turn on
+        if(cont.m_bLightOn == false) // turn on
         {
-          setSwitch(true);
+          cont.setSwitch(true);
           if(ee.autoTimer)
             nSecTimer = ee.autoTimer;
         }
@@ -707,10 +545,17 @@ void loop()
     else
       CallHost(Reason_Motion);
   }
+#endif
 
   if(sec_save != second()) // only do stuff once per second
   {
     sec_save = second();
+
+    if(wifi.isCfg())
+    {
+      wifi.seconds();
+      digitalWrite(WIFI_LED, !digitalRead(WIFI_LED)); // blink for config
+    }
 
     if(min_save != minute())    // only do stuff once per minute
     {
@@ -724,26 +569,17 @@ void loop()
       }
     }
 
-    if(--cs == 0)
-      checkStatus();
-
     if(nWrongPass)            // wrong password blocker
       nWrongPass--;
 
     if(--ssCnt == 0)
        sendState();
 
-    if(nBlinkLED1) // blink it
-    {
-      nBlinkLED1--;
-      digitalWrite(WIFI_LED, !digitalRead(WIFI_LED));
-    }
-
     if(nDelayOn)
     {
       if(--nDelayOn == 0)
       {
-        setSwitch(true);
+        cont.setSwitch(true);
         sendState(); // in case of monitoring
         CallHost(Reason_Switch);
         if(ee.autoTimer)
@@ -757,7 +593,7 @@ void loop()
       {
         if(checkSched(true) == false) // if no active scedule
         {
-          setSwitch(false);
+          cont.setSwitch(false);
           nSched = 0;
           sendState(); // in case of monitoring
           CallHost(Reason_Switch);
@@ -770,7 +606,7 @@ void loop()
 
 bool checkSched(bool bCheck) // Checks full schedule at the beginning of every minute
 {
-  if(bCheck == false && bLightOn) // skip if on, check if true
+  if(bCheck == false && cont.m_bLightOn) // skip if on, check if true
     return false;
 
   uint32_t timeNow = ((hour()*60) + minute()) * 60;
@@ -791,9 +627,9 @@ bool checkSched(bool bCheck) // Checks full schedule at the beginning of every m
         if(bOverride == false && ee.schedule[i].seconds && nSecTimer > 0)
         {
           if(ee.schedule[i].level)
-            nNewLightLevel = ee.schedule[i].level;
+            cont.setLevel(ee.schedule[i].level);
           else
-            setSwitch(true);
+            cont.setSwitch(true);
           CallHost(Reason_Switch);
           sendState();
         }
