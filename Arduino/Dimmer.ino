@@ -84,7 +84,7 @@ String dataJson()
   s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"name\":\"";  s += ee.szName; s += "\"";
   s += ",\"on\":";  s += cont.m_bLightOn;
-  s += ",\"l1\":";  s += digitalRead(WIFI_LED);
+  s += ",\"l1\":";  s += cont.m_bLED;
   s += ",\"lvl\":";  s += cont.m_nLightLevel;
   s += ",\"tr\":";  s += nSecTimer;
   s += ",\"sn\":";  s += nSched;
@@ -554,7 +554,7 @@ void loop()
     if(wifi.isCfg())
     {
       wifi.seconds();
-      digitalWrite(WIFI_LED, !digitalRead(WIFI_LED)); // blink for config
+      cont.setLED( !cont.m_bLED ); // blink for config
     }
 
     if(min_save != minute())    // only do stuff once per minute
