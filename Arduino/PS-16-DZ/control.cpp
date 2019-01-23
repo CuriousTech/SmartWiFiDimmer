@@ -14,6 +14,7 @@ swControl::swControl()
 void swControl::init()
 {
   digitalWrite(WIFI_LED, HIGH);
+  m_bLED = false;
   pinMode(WIFI_LED, OUTPUT);
   Serial.begin(19200);
 }
@@ -22,6 +23,7 @@ void swControl::listen()
 {
   static char inBuffer[64];
   static uint8_t idx;
+  static uint32_t tm;
 
   while(Serial.available())
   {
@@ -34,7 +36,9 @@ void swControl::listen()
       // parse
       if((p = strstr(inBuffer, "switch")) != NULL) // "switch":"on"
       {
-        m_bLightOn = (p[10] == 'n') ? true:false; // on or off
+        bool b = (p[10] == 'n') ? true:false; // on or off
+        m_bLightOn = b;
+        if(b) tm = now();
       }
       if((p = strstr(inBuffer, "bright")) != NULL) // "bright":99
       {
@@ -56,6 +60,15 @@ void swControl::listen()
   {
     m_nLightLevel = m_nNewLightLevel;
     setLevel();
+  }
+
+  if( m_bLightOn ) // stay on hack
+  {
+    if(now() - tm > (1000*60) ) // 1 minute
+    {
+      setSwitch(true);
+      tm = now();
+    }
   }
 }
 
@@ -83,11 +96,11 @@ void swControl::setLevel()
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, nLevelMin, nLevelMax) );
-
+  m_nNewLightLevel = constrain(n, nLevelMin, nLevelMax);
 }
 
 void swControl::setLED(bool bOn)
 {
-  digitalWrite(WIFI_LED, bOn ? false:true);
+  m_bLED = bOn;
+  digitalWrite(WIFI_LED, bOn ? false:true); // invert for this one
 }
