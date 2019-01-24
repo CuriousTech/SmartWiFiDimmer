@@ -64,7 +64,7 @@ void swControl::listen()
 
   if( m_bLightOn ) // stay on hack
   {
-    if(now() - tm > (1000*60) ) // 1 minute
+    if(now() - tm > 60 ) // 1 minute
     {
       setSwitch(true);
       tm = now();
