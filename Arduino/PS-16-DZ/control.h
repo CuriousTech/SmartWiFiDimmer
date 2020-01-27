@@ -14,10 +14,10 @@ public:
   void setSwitch(bool bOn);
   void setLevel(void);
   void setLevel(uint8_t level);
-  void setLED(bool bOn);
+  void setLED(uint8_t no, bool bOn);
 
   bool    m_bLightOn;      // state
-  bool    m_bLED;
+  bool    m_bLED[2];
   uint8_t m_nLightLevel = 50; // current level
   const uint8_t nLevelMin = 10;
   const uint8_t nLevelMax = 99;
