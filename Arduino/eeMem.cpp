@@ -9,17 +9,21 @@ eeSet ee = {              // Defaults for blank EEPROM
   "0.us.pool.ntp.org", 2390, -5, // NTP server, udp port, TZ
   "password", // device password for control
   {192,168,0,100}, 83, // host IP and port
-  "Dimmer",
+  "LivingRoom",
   0, // autoTimer
   0, // motionSecs
-  false,
-  0, // reserved
+  true, // report
+  false, // LED1
+  false, // LED2
+  19, // watts for device
+  154, // 15 cents per KWH
+  0, // total watts used
   {
-    {  6*60,  10*60, 254, 128, "Morning"},  // time, seconds, wday, level, name
-    { 12*60,  60*60, 254, 128, "Lunch"},
-    { 14*60, 120*60, 254, 128, "Something"},
-    { 18*60,  10*60,   2, 128, "Test"},
-  }
+    {  6*60,  10*60, 254, 100, "Morning"},  // time, seconds, wday, level, name
+    { 12*60,  60*60, 254, 60, "Lunch"},
+    { 14*60, 120*60, 254, 20, "Something"},
+  },
+  {0} // devices
 };
 
 eeMem::eeMem()
