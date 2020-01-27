@@ -1,4 +1,4 @@
-// Class for controlling capacitive touch dimmer
+// Class for controlling capacitive touch (+*-) dimmer
 
 #include "control.h"
 #include <TimeLib.h>
@@ -47,11 +47,11 @@ void swControl::listen()
           state = 2;
         break;
       case 2:
-        cmd = (uint16_t)c<<8;
+//        cmd = (uint16_t)c<<8;
         state = 3;
         break;
       case 3:
-        cmd |= (uint16_t)c;
+        cmd = (uint16_t)c;
         state = 4;
         break;
       case 4:
@@ -79,11 +79,11 @@ void swControl::listen()
               switch(len)
               {
                 case 5: // 01 00 01 00 01 01
-                  m_bLightOn = inBuffer[5];
+                  m_bLightOn = inBuffer[4];
                   break;
                 case 8: // 02 02 00 04 00 ?? 00 93
-                  m_nNewLightLevel = m_nLightLevel = inBuffer[7];
-                  m_bLightOn = (m_nLightLevel) ? true:false;
+                  m_nNewLightLevel = m_nLightLevel =
+                    map(inBuffer[7], nLevelMin, nLevelMax, 1, 100);
                   break;
               }
               break;
@@ -139,7 +139,7 @@ void swControl::setLevel()
   data[4] = 0;
   data[5] = 0; // not sure
   data[6] = 0;
-  data[7] = m_nLightLevel;
+  data[7] = map(m_nLightLevel, 0, 100, nLevelMin, nLevelMax);
   writeSerial(6, data, 8);
 }
 
@@ -149,10 +149,10 @@ bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint8_t len)
 
   buf[0] = 0x55;
   buf[1] = 0xAA;
-  buf[2] = 0;
-  buf[3] = cmd; // big endien
+  buf[2] = 0; // version
+  buf[3] = cmd; 
   buf[4] = 0;
-  buf[5] = len;
+  buf[5] = len;  // big endien
 
   int i;
   if(p) for(i = 0; i < len; i++)
@@ -167,10 +167,12 @@ bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint8_t len)
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, nLevelMin, nLevelMax) );
+  m_nNewLightLevel = constrain(n, 0, 100);
 }
 
-void swControl::setLED(bool bOn)
+void swControl::setLED(uint8_t no, bool bOn)
 {
-  digitalWrite(WIFI_LED, bOn);
+  m_bLED[no] = bOn;
+  if(no == 0)
+    digitalWrite(WIFI_LED, bOn);
 }
