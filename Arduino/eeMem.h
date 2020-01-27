@@ -27,6 +27,16 @@ struct Sched          // User set schedule item
 }; // 28 bytes aligned
 
 #define MAX_SCHED 50
+#define MAX_DEV 20
+
+struct Device
+{
+  char szName[32];
+  uint8_t IP[4];
+  uint16_t port;
+  bool bOn;
+  uint8_t level;
+}; // 40
 
 struct eeSet // EEPROM backed data
 {
@@ -37,16 +47,21 @@ struct eeSet // EEPROM backed data
   char     ntpServer[32]; // ntp server URL
   uint16_t udpPort;       // udp port
   int8_t   tz;            // Timezone offset
-  char     controlPassword[32];
+  char     szControlPassword[32];
   uint8_t  hostIP[4];
   uint16_t hostPort;
   char     szName[28];
   uint32_t autoTimer;
   uint16_t nMotionSecs;
   bool     bCall;        // use callHost
-  uint8_t  reserved; // 212
+  bool     bLED1; // 212
+  bool     bLED2;
+  uint16_t watts;
+  uint16_t ppkw;
+  float    fTotalWatts;
   Sched    schedule[MAX_SCHED];  // 50*28
-}; // 1612
+  struct Device dev[MAX_DEV];
+}; // 1612 + (40*MAX_DEV)
 
 extern eeSet ee;
 
