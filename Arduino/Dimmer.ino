@@ -21,11 +21,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// Arduino IDE 1.9.0, esp8266 SDK 2.4.2
+// Arduino IDE 1.9.0, esp8266 SDK 2.6.3
 
-//uncomment to enable Arduino IDE Over The Air update code
-#define OTA_ENABLE
-//#define MOTION
+#define OTA_ENABLE //uncomment to enable Arduino IDE Over The Air update code
+
 #include <Wire.h>
 #include <EEPROM.h>
 #include <ESP8266mDNS.h>
@@ -42,11 +41,12 @@ SOFTWARE.
 #include "control.h"
 #include <JsonParse.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonParse
 #include <JsonClient.h>
+#include "jsonstring.h"
 
 #define ESP_LED    2  // open (ESP-07 low = blue LED on)
-#define MOTION    16  // RCW-0516 (no internal pullup)
+//#define MOTION    14  // Basement=12, LivingRoom=16 RCW-0516, Back switch 14
 
-int serverPort = 80;                    // listen port
+int serverPort = 80;   // listen port
 
 IPAddress lastIP;     // last IP that accessed the device
 int nWrongPass;       // wrong password block counter
@@ -54,11 +54,13 @@ int nWrongPass;       // wrong password block counter
 eeMem eemem;
 UdpTime utime;
 uint16_t nSecTimer; // off timer
+uint16_t onCounter; // usage timer
 uint16_t nDelayOn;  // delay on timer
 uint8_t nSched;     // current schedule
 bool    bOverride;    // automatic override of schedule
 uint8_t nWsConnected;
 bool    bEnMot = true;
+bool    bOldOn;
 
 WiFiManager wifi;  // AP page:  192.168.4.1
 AsyncWebServer server( serverPort );
@@ -66,7 +68,8 @@ AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 
 void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
 JsonParse jsonParse(jsonCallback);
-JsonClient jsonPush(jsonCallback);
+void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
+JsonClient jsonPush(jsonPushCallback);
 
 swControl cont;
 
@@ -76,25 +79,36 @@ enum reportReason
   Reason_Switch,
   Reason_Level,
   Reason_Motion,
+  Reason_Test,
 };
+
+void totalUpWatts()
+{
+  if(onCounter == 0)
+    return; // level 0 = switch
+  uint8_t m = (cont.m_nLightLevel ? map(cont.m_nLightLevel, 0, 100, 60, 100) : 100);  // 1% = about 60% power
+  float w = (float)ee.watts * m / 100;
+  ee.fTotalWatts += (float)onCounter * w  / 3600; // add current cycle
+  onCounter = 0;
+}
 
 String dataJson()
 {
-  String s = "state;{\"t\":";
-  s += now() - ( (ee.tz + utime.getDST() ) * 3600);
-  s += ",\"name\":\"";  s += ee.szName; s += "\"";
-  s += ",\"on\":";  s += cont.m_bLightOn;
-  s += ",\"l1\":";  s += cont.m_bLED;
-  s += ",\"lvl\":";  s += cont.m_nLightLevel;
-  s += ",\"tr\":";  s += nSecTimer;
-  s += ",\"sn\":";  s += nSched;
-  s += ",\"mn\":";  s += cont.nLevelMin;
-  s += ",\"mx\":";  s += cont.nLevelMax;
+  jsonString js("state");
+  js.Var("t", now() - ( (ee.tz + utime.getDST() ) * 3600) );
+  js.Var("on", cont.m_bLightOn);
+  js.Var("l1", cont.m_bLED[0]);
+  js.Var("l2", cont.m_bLED[1]);
+  js.Var("lvl", constrain(cont.m_nLightLevel, 1, 100));
+  js.Var("tr", nSecTimer);
+  js.Var("sn", nSched);
+  js.Var("rssi", WiFi.RSSI());
+  totalUpWatts();
+  js.Var("wh", ee.fTotalWatts );
 #ifdef MOTION
-  s += ",\"mo\":";  s += digitalRead(MOTION);
+  js.Var("mo", digitalRead(MOTION));
 #endif
-  s += "}";
-  return s;
+  return js.Close();
 }
 
 void parseParams(AsyncWebServerRequest *request)
@@ -122,7 +136,7 @@ void parseParams(AsyncWebServerRequest *request)
 
   IPAddress ip = request->client()->remoteIP();
 
-  if(strcmp(ee.controlPassword, password))
+  if(strcmp(ee.szControlPassword, password))
   {
     if(nWrongPass == 0) // it takes at least 10 seconds to recognize a wrong password
       nWrongPass = 10;
@@ -130,13 +144,10 @@ void parseParams(AsyncWebServerRequest *request)
       nWrongPass <<= 1;
     if(ip != lastIP)  // if different IP drop it down
        nWrongPass = 10;
-    String data = "hack;{\"ip\":\"";
-    data += request->client()->remoteIP().toString();
-    data += "\",\"pass\":\"";
-    data += password; // a String object here adds a NULL.  Possible bug in SDK
-    data += "\"}";
-    ws.textAll(data);
-    data = String();
+    jsonString js("hack");
+    js.Var("ip", request->client()->remoteIP().toString() );
+    js.Var("pass", password);
+    ws.textAll(js.Close());
     lastIP = ip;
     return;
   }
@@ -154,29 +165,33 @@ void parseParams(AsyncWebServerRequest *request)
       case 's': // wifi SSID
         s.toCharArray(ee.szSSID, sizeof(ee.szSSID));
         break;
-      case 'p': // wifi password
-        wifi.setPass(s.c_str());
+      case 'p': // wifi password, or host port
+        if(s.toInt())
+          ee.hostPort = s.toInt();
+        else
+          wifi.setPass(s.c_str());
         break;
       case 'o': // light on/off
         if(nSched) bOverride = !bValue;
+        bOldOn = !bValue; // force report
         cont.setSwitch(bValue);
         if(bValue && ee.autoTimer)
           nSecTimer = ee.autoTimer;
         break;
       case 'l': // level
         if(nSched) bOverride = (s.toInt() == 0);
-        cont.setLevel( s.toInt() );
+        cont.setLevel( constrain(s.toInt(), 1, 100) );
         if(s.toInt() && ee.autoTimer)
           nSecTimer = ee.autoTimer;
         break;
-      case 'c':
+      case 'c': // callHost enable
         ee.bCall = bValue;
         break;
       case 'd': // delay off
         if(cont.m_bLightOn)
           nSecTimer = s.toInt();
         break;
-      case 'n':
+      case 'n': // name
         if(s.length())
           s.toCharArray(ee.szName, sizeof(ee.szName));
         else
@@ -187,15 +202,96 @@ void parseParams(AsyncWebServerRequest *request)
       case 'a': // autoTimer
         ee.autoTimer = s.toInt();
         break;
-      case 'h': // host IP / port  (call from host with ?h=80)
+      case 'h': // host IP / port  (call from host with ?h=80 or give full IP)
+        if(s.length() > 9)
+        {
+          ee.hostPort = 80;
+          ip.fromString(s.c_str());
+        }
+        else
+          ee.hostPort = s.toInt() ? s.toInt():80;
         ee.hostIP[0] = ip[0];
         ee.hostIP[1] = ip[1];
         ee.hostIP[2] = ip[2];
         ee.hostIP[3] = ip[3];
-        ee.hostPort = s.toInt() ? s.toInt():80;
         CallHost(Reason_Setup); // test
         break;
+     case 't': // ntp
+        s.toCharArray(ee.ntpServer, sizeof(ee.ntpServer));
+        break;
     }
+  }
+}
+
+String removeQuotes(String s)
+{
+  if(s.charAt(0) == '"')
+  {
+    s.remove(0,1);
+    s.remove(s.length()-1, 1);
+  }
+  return s;
+}
+
+void parseWiFiParams(AsyncWebServerRequest *request)
+{
+  if(request->params() == 0)
+    return;
+
+  AsyncWebParameter *p;
+  char temp[100];
+
+  IPAddress ip = request->client()->remoteIP();
+
+  if(!request->hasParam("name"))
+    return;
+  p = request->getParam("name");
+  p->value().toCharArray(temp, sizeof(temp));
+  String sName = p->value();
+  if(sName.charAt(0) == '"')
+  {
+    sName.remove(0,1);
+    sName.remove(sName.length()-1, 1);
+  }
+  int i;
+  for(i = 0; ee.dev[i].szName[0] && i < MAX_DEV; i++)
+    if(sName.equals(ee.dev[i].szName))
+      break;
+  if(!request->hasParam("reason"))
+    return;
+  p = request->getParam("reason");
+  String sReason = p->value();
+  if(sReason.charAt(0) == '"')
+  {
+    sReason.remove(0,1);
+    sReason.remove(sReason.length()-1, 1);
+  }
+
+  if(sReason == "setup")
+  {
+    if(!request->hasParam("port"))
+      return;
+    p = request->getParam("port");
+    sName.toCharArray(ee.dev[i].szName, sizeof(ee.dev[0].szName) );
+    ee.dev[i].IP[0] = ip[0];
+    ee.dev[i].IP[1] = ip[1];
+    ee.dev[i].IP[2] = ip[2];
+    ee.dev[i].IP[3] = ip[3];
+    ee.dev[i].port = p->value().toInt();
+  }
+  else if(sReason == "switch")
+  {
+    if(!request->hasParam("on"))
+      return;
+    p = request->getParam("on");
+    ee.dev[i].bOn = p->value().toInt();
+  }
+  else if(sReason == "level")
+  {
+    if(!request->hasParam("value"))
+      return;
+    p = request->getParam("value");
+    ee.dev[i].level = p->value().toInt();    
   }
 }
 
@@ -211,7 +307,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       if(bRestarted)
       {
         bRestarted = false;
-        client->text("alert;restarted");
+        client->text("alert;Restarted");
       }
       client->text(dataJson());
       client->ping();
@@ -251,24 +347,28 @@ const char *jsonListCmd[] = { "cmd",
   "auto",
   "sch",
   "led1",
+  "led2",
   "lvl",
   "TZ",
-  "NTP",
-  "NTPP", // 10
+  "NTP", // 10
+  "NTPP",
   "MOT",
+  "del",
   "ch",
+  "ppkw",
+  "watts",
+  "rt",
   "I",
   "N",
-  "S",
+  "S", // 20
   "T",
   "W",
-  "L", // 18
+  "L", // 23
   NULL
 };
 
 void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
 {
-  if(!bKeyGood && iName) return; // only allow for key
   char *p, *p2;
   static int n;
   static int idx;
@@ -276,14 +376,16 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
   switch(iEvent)
   {
     case 0: // cmd
+      if(!bKeyGood && iName) return; // only allow for key
       switch(iName)
       {
         case 0: // key
-          if(!strcmp(psValue, ee.controlPassword)) // first item must be key
+          if(psValue) if(!strcmp(psValue, ee.szControlPassword)) // first item must be key
             bKeyGood = true;
           break;
         case 1: // on
           nSecTimer = 0;
+          bOldOn = !iValue; // force report
           cont.setSwitch(iValue);
           if(nSched) bOverride = !iValue;
           if(iValue && ee.autoTimer)
@@ -302,49 +404,113 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           // schedule a time
           break;
         case 6: // led1
-          cont.setLED(iValue);
+          cont.setLED(0, iValue);
+          ee.bLED1 = iValue ? true:false;
           break;
-        case 7: // lvl
+        case 7: // led2
+          cont.setLED(1, iValue);
+          ee.bLED2 = iValue ? true:false;
+          break;
+        case 8: // lvl
           cont.setLevel(iValue);
           break;
-        case 8: // TZ
+        case 9: // TZ
           ee.tz = iValue;
+          if(ee.ntpServer[0]) utime.start();
+          break;
+        case 10: // NTP
+          if(psValue) strncpy(ee.ntpServer, psValue, sizeof(ee.ntpServer) );
           utime.start();
           break;
-        case 9: // NTP
-          strncpy(ee.ntpServer, psValue, sizeof(ee.ntpServer) );
-          utime.start();
-          break;
-        case 10: // NTPP
+        case 11: // NTPP
           ee.udpPort = iValue;
-          utime.start();
+          if(ee.ntpServer[0]) utime.start();
           break;
-        case 11: // MOT
+        case 12: // MOT
           ee.nMotionSecs = iValue;
           break;
-        case 12: // ch
+        case 13: // del
+          if(psValue) for(int i = 0; i < MAX_DEV && ee.dev[i].szName[0]; i++)
+          {
+            if(!strcmp(ee.dev[i].szName, psValue))
+            {
+              memset(&ee.dev[i], 0, sizeof(Device));
+              if( i < MAX_DEV - 1)
+                memmove(&ee.dev[i], &ee.dev[i+1], sizeof(Device) * (MAX_DEV - i));
+              break;
+            }
+          }
+          break;
+        case 14: // ch
           ee.bCall = iValue ? true:false;
           if(iValue) CallHost(Reason_Setup); // test
           break;
-        case 13: //I
+        case 15: // PPWH
+          ee.ppkw = iValue;
+          break;
+        case 16: // watts
+          ee.watts = iValue;
+          break;
+        case 17: // rt
+          ee.fTotalWatts = 0;
+          break;
+        case 18: //I
           n = constrain(iValue, 0, MAX_SCHED-1);
           break;
-        case 14: // N
-          strncpy(ee.schedule[n].sname, psValue, sizeof(ee.schedule[0].sname) );
+        case 19: // N
+          if(psValue)
+            strncpy(ee.schedule[n].sname, psValue, sizeof(ee.schedule[0].sname) );
           break;
-        case 15: // S
+        case 20: // S
           ee.schedule[n].timeSch = iValue;
           break;
-        case 16: // T
+        case 21: // T
           ee.schedule[n].seconds = iValue;
           break;
-        case 17: // W
+        case 22: // W
           ee.schedule[n].wday = iValue;
           break;
-        case 18: // L
+        case 23: // L
           ee.schedule[n].level = iValue;
           break;
+        default:
+          break;
       }
+      break;
+  }
+}
+
+const char *jsonListPush[] = { "time",
+  "time", // 0
+  "ppkw",
+  NULL
+};
+
+uint8_t failCnt;
+
+void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
+{
+  switch(iEvent)
+  {
+    case -1: // status
+      if(iName >= JC_TIMEOUT)
+      {
+        failCnt ++;
+        if(failCnt > 5)
+          ESP.restart();
+      }
+      else failCnt = 0;
+      break;
+    case 0: // time
+      switch(iName)
+      {
+        case 0: // time
+          setTime(iValue + ( (ee.tz + utime.getDST() ) * 3600));
+          break;
+      }
+      break;
+    case 1: // ppkw
+      ee.ppkw = iValue;
       break;
   }
 }
@@ -362,6 +528,7 @@ void CallHost(reportReason r)
   {
     case Reason_Setup:
       sUri += "setup&port="; sUri += serverPort;
+      sUri += "&on="; sUri += cont.m_bLightOn;
       break;
     case Reason_Switch:
       sUri += "switch&on="; sUri += cont.m_bLightOn;
@@ -373,11 +540,11 @@ void CallHost(reportReason r)
       sUri += "motion";
       break;
   }
-  
+
   IPAddress ip(ee.hostIP);
   String url = ip.toString();
   jsonPush.begin(url.c_str(), sUri.c_str(), ee.hostPort, false, false, NULL, NULL);
-  jsonPush.addList(jsonListCmd);
+  jsonPush.addList(jsonListPush);
 }
 
 uint8_t ssCnt = 58;
@@ -389,21 +556,20 @@ void sendState()
   ssCnt = 58;
 }
 
-
 void setup()
 {
   cont.init();
   WiFi.hostname(ee.szName);
-  wifi.autoConnect(ee.szName, ee.controlPassword); // Tries config AP, then starts softAP mode for config
+  wifi.autoConnect(ee.szName, ee.szControlPassword); // Tries config AP, then starts softAP mode for config
   if(wifi.isCfg() == false)
   {
     if ( !MDNS.begin ( ee.szName, WiFi.localIP() ) );
-    cont.setLED(true);
+    cont.setLED(0, ee.bLED1);
   }
   // attach AsyncWebSocket
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
-
+  
   server.on ( "/", HTTP_GET|HTTP_POST, [](AsyncWebServerRequest *request)
   {
     if(wifi.isCfg())
@@ -443,14 +609,38 @@ void setup()
       if(ee.schedule[i].sname[0]==0)
         break;
     }
-    s += "]\n";
-    s += "data={\"tz\":";  s += ee.tz;
-    s += ",\"mot\":";  s += ee.nMotionSecs;
-    s += ",\"ch\":";   s += ee.bCall;
-    s += ",\"auto\":";  s += ee.autoTimer;
-    s += "}";
+    s += "]\ndev=[\n";
+    for(int i = 0; i < MAX_DEV && ee.dev[i].szName[0]; i++)
+    {
+      if(i) s += ",\n";
+      s += "[\"";  s += ee.dev[i].szName;
+      s += "\",\""; s += ee.dev[i].IP[0]; s += "."; s += ee.dev[i].IP[1]; s += "."; s += ee.dev[i].IP[2]; s += "."; s += ee.dev[i].IP[3];
+      s += "\",";  s += ee.dev[i].port;
+      s += ","; s += ee.dev[i].bOn;
+      s += ","; s += ee.dev[i].level;
+      s += "]";
+    }
+    
+    s += "]\ndata=";
+    jsonString js;
+    js.Var("name", ee.szName);
+    js.Var("tz", ee.tz);
+    js.Var("mot", ee.nMotionSecs);
+    js.Var("ch", ee.bCall);
+    js.Var("auto", ee.autoTimer);
+    js.Var("ppkw", ee.ppkw);
+    js.Var("watt", ee.watts);
+    s += js.Close();
 
     request->send(200, "text/json", s);
+  });
+  server.on ( "/wifi", HTTP_GET|HTTP_POST, [](AsyncWebServerRequest *request)
+  {
+    parseWiFiParams(request);
+    jsonString js;
+    js.Var("time", now() - ( (ee.tz + utime.getDST() ) * 3600) );
+    js.Var("ppkw", ee.ppkw );
+    request->send(200, "text/plain", js.Close());
   });
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
     AsyncWebServerResponse *response = request->beginResponse_P(200, "image/x-icon", favicon, sizeof(favicon));
@@ -472,13 +662,13 @@ void setup()
   ArduinoOTA.begin();
   ArduinoOTA.onStart([]() {
     eemem.update();
-    cont.setLED(false); // set it all to off
+    cont.setLED(0, false); // set it all to off
+    cont.setLED(1, false);
     cont.setSwitch(false);
   });
 #endif
-  if(wifi.isCfg() == false)
+  if(wifi.isCfg() == false && ee.ntpServer[0])
     utime.start();
-  CallHost(Reason_Setup);
 }
 
 void loop()
@@ -493,32 +683,34 @@ void loop()
   ArduinoOTA.handle();
 #endif
 
-  if(!wifi.isCfg())
+  if(!wifi.isCfg() && ee.ntpServer[0])
     utime.check(ee.tz);
   cont.listen();
 
   static uint8_t nOldLevel;
-  static bool bOldOn;
   static uint32_t tm;
   if(cont.m_nLightLevel != nOldLevel && !Serial.available() && (millis() - tm > 120) ) // new level from MCU & no new serial data
   {
     sendState();
     CallHost(Reason_Level);
     tm = millis();
-    bOldOn = cont.m_bLightOn; // reduce calls
+//    bOldOn = cont.m_bLightOn; // reduce calls
     nOldLevel = cont.m_nLightLevel;
   }
 
   if(cont.m_bLightOn != bOldOn)
   {
     bOldOn = cont.m_bLightOn;
-    nSecTimer = 0;
+//    if(ee.bLED1) cont.setLED(0, bOldOn ? false:true); // paddle dimmer, green on when lights off
     CallHost(Reason_Switch);
     sendState();
     if(nSched && cont.m_bLightOn)
       bOverride = cont.m_bLightOn;
     if(cont.m_bLightOn && ee.autoTimer)
       nSecTimer = ee.autoTimer;
+
+    if(cont.m_bLightOn == false)
+      totalUpWatts();
   }
 
 #ifdef MOTION
@@ -554,7 +746,7 @@ void loop()
     if(wifi.isCfg())
     {
       wifi.seconds();
-      cont.setLED( !cont.m_bLED ); // blink for config
+      cont.setLED(0, !cont.m_bLED ); // blink for config
     }
 
     if(min_save != minute())    // only do stuff once per minute
@@ -564,9 +756,24 @@ void loop()
       if (hour_save != hour())  // update our time daily (at 2AM for DST)
       {
         if( (hour_save = hour()) == 2)
-          utime.start();
+        {
+          if(ee.ntpServer[0]) utime.start();
+        }
         eemem.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
       }
+
+      static uint8_t setupCnt = 2;
+      if(--setupCnt == 0)
+      {
+        setupCnt = 60;
+        CallHost(Reason_Setup);
+      }
+    }
+
+    if(cont.m_bLightOn)
+    {
+      if(++onCounter > (60*60*12))
+        totalUpWatts();
     }
 
     if(nWrongPass)            // wrong password blocker
@@ -580,8 +787,6 @@ void loop()
       if(--nDelayOn == 0)
       {
         cont.setSwitch(true);
-        sendState(); // in case of monitoring
-        CallHost(Reason_Switch);
         if(ee.autoTimer)
           nSecTimer = ee.autoTimer;
       }
@@ -596,7 +801,6 @@ void loop()
           cont.setSwitch(false);
           nSched = 0;
           sendState(); // in case of monitoring
-          CallHost(Reason_Switch);
         }
       }
     }
@@ -623,6 +827,7 @@ bool checkSched(bool bCheck) // Checks full schedule at the beginning of every m
           bEnMot = false;
 
         nSecTimer = ee.schedule[i].seconds - (timeNow - start); // delay for time left
+
         nSched = i + 1; // 1 = entry 0
         if(bOverride == false && ee.schedule[i].seconds && nSecTimer > 0)
         {
@@ -630,7 +835,6 @@ bool checkSched(bool bCheck) // Checks full schedule at the beginning of every m
             cont.setLevel(ee.schedule[i].level);
           else
             cont.setSwitch(true);
-          CallHost(Reason_Switch);
           sendState();
         }
         return true;
@@ -642,7 +846,7 @@ bool checkSched(bool bCheck) // Checks full schedule at the beginning of every m
 
 void compactSched()   // remove blanks in the middle of a list by shifting up
 {
-  for(int i = 0; i < MAX_SCHED - 1; i++)
+  for(int i = 0; i < MAX_SCHED - 2; i++)
   {
      if(ee.schedule[i].sname[0] == 0)
      {
