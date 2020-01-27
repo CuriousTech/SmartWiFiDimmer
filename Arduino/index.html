@@ -13,33 +13,42 @@ background-image: linear-gradient(top, #ffffff, #50a0ff);
 background-clip: padding-box;}
 body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
 </style>
-<script type="text/javascript" src="data"></script>
+<script type="text/javascript" src="http://192.168.0.104/data"></script>
 <script type="text/javascript">
 a=document.all
 idx=0
 function openSocket(){
-ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.118/ws")
+//ws=new WebSocket("ws://"+window.location.host+"/ws")
+ws=new WebSocket("ws://192.168.0.104/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
-console.log(evt.data)
+//console.log(evt.data)
  lines=evt.data.split(';')
  event=lines[0]
  data=lines[1]
  if(event=='state'){
- 	d=JSON.parse(data)
+	d=JSON.parse(data)
 	d2=new Date(d.t*1000)
 	days=[['Sun'],['Mon'],['Tue'],['Wed'],['Thu'],['Fri'],['Sat']]
 	a.time.innerHTML=days[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
 	a.RLY.value=d.on?' ON ':'OFF'
 	a.RLY.setAttribute('style',d.on?'color:red':'')
 	a.LED1.value=d.l1?' ON ':'OFF'
-	a.LED1.setAttribute('style',d.l1?'color:green':'')
+	a.LED1.setAttribute('style',d.l1?'color:blue':'')
+	a.LED2.value=d.l2?' ON ':'OFF'
+	a.LED2.setAttribute('style',d.l2?'color:blue':'')
 	a.LVL.value=d.lvl
 	a.level.value=d.lvl
-	a.level.min=d.mn
-	a.level.max=d.mx
+	a.rssi.innerHTML=d.rssi+'dB'
+	if(d.lvl==0)
+	{
+	 a.LVL.style.visibility='hidden'
+	 a.level.style.visibility='hidden'
+	 a.lbl.style.visibility='hidden'
+	}
+	a.wh.value=d.wh
+	a.cost.value=((+d.wh)*(+a.ppkw.value/1000)).toFixed(3)
 	a.MOT.setAttribute('bgcolor',d.mo?'red':'')
 	if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')
  }
@@ -49,6 +58,8 @@ console.log(evt.data)
 }
 function setVar(varName, value)
 {
+console.log('cmd;{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
+
  ws.send('cmd;{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
 }
 function manual()
@@ -65,6 +76,13 @@ on=(a.LED1.value=='OFF')
 setVar('led1',on)
 a.LED1.value=on?' ON ':'OFF'
 a.LED1.setAttribute('style',on?'color:blue':'')
+}
+function led2()
+{
+on=(a.LED2.value=='OFF')
+setVar('led2',on)
+a.LED2.value=on?' ON ':'OFF'
+a.LED2.setAttribute('style',on?'color:blue':'')
 }
 
 function t2hms(t)
@@ -124,9 +142,13 @@ function setData()
    item.push(['',60,60,255])
    AddEntry(item[item.length-1])
   }
-  setVar('MOT',hms2t(a.mtime.value))
-  setVar('auto',hms2t(a.auto.value))
-  setVar('TZ',a.TZ.value)
+  s='cmd;{"key":"'+a.myKey.value+'",'
+  s+='"MOT":' +hms2t(a.mtime.value)+','
+  s+='"auto":'+hms2t(a.auto.value)+','
+  s+='"TZ":'+a.TZ.value+','
+  s+='"watts":'+a.watts.value+','
+  s+='"ppkw":'+(+a.ppkw.value)*1000+'}'
+  ws.send(s)
 }
 
 function togCall()
@@ -154,15 +176,27 @@ function setAuto()
   setVar('auto',hms2t(a.auto.value))
 }
 
+function clearWh()
+{
+  setVar('rt',0)
+  a.cost.value='0.000'
+  a.wh.value='0.00'
+}
+
 function fillData()
 {
   a.TZ.value=data.tz
+  a.nm.innerHTML='<b>'+data.name+'</b>'
   a.mtime.value=t2hms(data.mot)
   a.auto.value=t2hms(data.auto)
   a.CH.value=data.ch?' ON ':'OFF'
   a.CH.setAttribute('style',data.ch?'color:red':'')
+  a.watts.value=data.watt
+  a.ppkw.value=data.ppkw/1000
   for(it=0;it<item.length;it++)
   	AddEntry(item[it])
+  for(d=0;d<dev.length;d++)
+  	AddDev(dev[d])
 }
 
 function AddEntry(arr)
@@ -215,6 +249,51 @@ function AddEntry(arr)
   idx++
 }
 
+// "Bedroom","192.168.0.122",80,0,0
+function AddDev(arr)
+{
+  td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.id='D'+idx
+  inp.type='button'
+  inp.size=11
+  inp.value=arr[0]
+  inp.onclick = function() {console.log(this); }
+  td.appendChild(inp)
+
+  inp=document.createElement("input")
+  inp.id='ON'+idx
+  inp.type='button'
+  inp.value=arr[3]?'ON':'OFF'
+  inp.size=3
+  td.appendChild(inp)
+
+  inp=document.createElement("input")
+  inp.id='eLvl'+idx
+  inp.type='text'
+  inp.value=arr[4]
+  inp.size=2
+  td.appendChild(inp)
+
+  inp=document.createElement("input")
+  inp.id='R'+idx
+  inp.type='range'
+  inp.value=arr[4]
+  inp.min=0
+  inp.max=100
+  inp.size=2
+  inp.onchange=function(){console.log(this); }
+  td.appendChild(inp)
+
+  tr=document.createElement("tr")
+  tr.id='dv'+idx
+  tr.appendChild(td)
+  tbody=document.createElement("tbody")
+  tbody.id='tbody'+idx
+  tbody.appendChild(tr)
+  a.dev.appendChild(tbody)
+  idx++
+}
 </script>
 <body bgcolor="silver" onload="{
 key=localStorage.getItem('key')
@@ -224,18 +303,22 @@ fillData()
 }"
 >
 <table align="right" width="450">
-<tr><td>Light</td><td>LED &nbsp Report</td><td><div id="time"></div></td></tr>
+<tr><td>Light</td><td>LED1 &nbsp LED2</td><td><div id="nm"></div></td><td><div id="time"></div></td></tr>
 <tr><td><input name="RLY" value="OFF" type='button' onclick="{manual()}"></td>
-<td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="CH" value="OFF" type='button' onclick="{togCall()}"></td>
-<td><label for="auto">Auto Off </label><input name="auto" type="text" value="0" size="4"> &nbsp &nbsp <label for="TZ">TZ </label><input name="TZ" type=text size=1 value='-5'></td></tr>
+<td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
+<td colspan=2><label for="CH">Rpt<input name="CH" value="OFF" type='button' onclick="{togCall()}"> <label for="auto"> Auto Off </label><input name="auto" type="text" value="0" size="4"> &nbsp <label for="TZ">TZ </label><input name="TZ" type=text size=1 value='-5'></td></tr>
 <tr>
-<td colspan="3"><label for="LVL">Level </label><input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min="10" max="99" onchange="slide();">  &nbsp
+<td colspan=4><label for="LVL" id="lbl">Level </label><input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min=1 max=100 onchange="slide();">  &nbsp
  &nbsp <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
 
-<tr><td>Name &nbsp </td><td colspan=2><small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration Level</td></tr>
+<tr><td>Name &nbsp </td><td colspan=3><small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration Level</td></tr>
 </table>
 <table align="right" style="font-size:small" id="list"></table>
+<table width="450" align="right" style="font-size:small" id="dev"></table>
 <table align="right" width="450">
+<tr><td><div id="rssi">0db</div></td><td>PPKW<input name="ppkw" type=text size=3> &nbsp Watts
+ <input name=watts type=text size=1> </td><td>WH<input id="wh" name="wh" type=button size=8 onclick="clearWh();"> Cost<input id="cost" name="cost" type=button size=8 onclick="clearWh();">
+</td></tr>
 <tr><td id="MOT">Motion</td><td><input name="mtime" type=text size=4 style="width: 60px"> &nbsp
  <input value='Save Changes' type=button onclick="setData();"> &nbsp </td><td> <input id="myKey" name="key" type=text size=50 placeholder="password" style="width: 128px">
 <input type="button" value="Set" onClick="{localStorage.setItem('key', key = document.all.myKey.value)}"></td></tr>
