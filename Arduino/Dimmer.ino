@@ -126,11 +126,10 @@ void parseParams(AsyncWebServerRequest *request)
     p->value().toCharArray(temp, 100);
     String s = wifi.urldecode(temp);
 
-    switch( p->name().charAt(0) )
+    if( p->name().equals("key") )
     {
-      case 'k': // key
-        s.toCharArray(password, sizeof(password));
-        break;
+      s.toCharArray(password, sizeof(password));
+      break;
     }
   }
 
@@ -154,44 +153,62 @@ void parseParams(AsyncWebServerRequest *request)
 
   lastIP = ip;
 
+  const char Names[][8]={
+    "ssid", // 0
+    "pass",
+    "on",
+    "level",
+    "ch",
+    "dly",
+    "name",
+    "auto",
+    "hostip",
+    "ntp",
+    "",
+  };
+
   for ( uint8_t i = 0; i < request->params(); i++ ) {
     AsyncWebParameter* p = request->getParam(i);
     p->value().toCharArray(temp, 100);
     String s = wifi.urldecode(temp);
     bool bValue = (s == "true" || s == "1") ? true:false;
 
-    switch( p->name().charAt(0)  )
+    uint8_t idx;
+    for(idx = 0; Names[idx][0]; idx++)
+      if( p->name().equals(Names[idx]) )
+        break;
+    switch( idx )
     {
-      case 's': // wifi SSID
+      case 0: // wifi SSID
         s.toCharArray(ee.szSSID, sizeof(ee.szSSID));
         break;
-      case 'p': // wifi password, or host port
+      case 1: // wifi password, or host port
         if(s.toInt())
           ee.hostPort = s.toInt();
         else
           wifi.setPass(s.c_str());
         break;
-      case 'o': // light on/off
+      case 2: // light on/off
         if(nSched) bOverride = !bValue;
         bOldOn = !bValue; // force report
         cont.setSwitch(bValue);
         if(bValue && ee.autoTimer)
           nSecTimer = ee.autoTimer;
         break;
-      case 'l': // level
+      case 3: // level
         if(nSched) bOverride = (s.toInt() == 0);
         cont.setLevel( constrain(s.toInt(), 1, 100) );
         if(s.toInt() && ee.autoTimer)
           nSecTimer = ee.autoTimer;
         break;
-      case 'c': // callHost enable
+      case 4: // callHost enable
         ee.bCall = bValue;
         break;
-      case 'd': // delay off
+      case 5: // delay off
         if(cont.m_bLightOn)
           nSecTimer = s.toInt();
         break;
-      case 'n': // name
+      case 6: // name
         if(s.length())
           s.toCharArray(ee.szName, sizeof(ee.szName));
         else
@@ -199,10 +216,10 @@ void parseParams(AsyncWebServerRequest *request)
         eemem.update();
         ESP.reset();
         break;
-      case 'a': // autoTimer
+      case 7: // autoTimer
         ee.autoTimer = s.toInt();
         break;
-      case 'h': // host IP / port  (call from host with ?h=80 or give full IP)
+      case 8: // host IP / port  (call from host with ?h=80 or give full IP)
         if(s.length() > 9)
         {
           ee.hostPort = 80;
@@ -216,7 +233,7 @@ void parseParams(AsyncWebServerRequest *request)
         ee.hostIP[3] = ip[3];
         CallHost(Reason_Setup); // test
         break;
-     case 't': // ntp
+     case 9: // ntp
         s.toCharArray(ee.ntpServer, sizeof(ee.ntpServer));
         break;
     }
@@ -507,10 +524,10 @@ void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
         case 0: // time
           setTime(iValue + ( (ee.tz + utime.getDST() ) * 3600));
           break;
+        case 1: // ppkw
+          ee.ppkw = iValue;
+          break;
       }
-      break;
-    case 1: // ppkw
-      ee.ppkw = iValue;
       break;
   }
 }
