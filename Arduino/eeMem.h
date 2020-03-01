@@ -33,9 +33,9 @@ struct Device
 {
   char szName[32];
   uint8_t IP[4];
-  uint16_t port;
-  bool bOn;
-  uint8_t level;
+  uint16_t delay;
+  uint8_t mode;
+  uint8_t flags;
 }; // 40
 
 struct eeSet // EEPROM backed data
@@ -54,13 +54,16 @@ struct eeSet // EEPROM backed data
   uint32_t autoTimer;
   uint16_t nMotionSecs;
   bool     bCall;        // use callHost
-  bool     bLED1; // 212
-  bool     bLED2;
+  uint8_t  bLED[2]; // 212
   uint16_t watts;
   uint16_t ppkw;
+  uint8_t  bLightOn;
+  uint8_t  nLightLevel;
   float    fTotalWatts;
+  uint32_t nTotalSeconds;
   Sched    schedule[MAX_SCHED];  // 50*28
   struct Device dev[MAX_DEV];
+  uint8_t res[2];
 }; // 1612 + (40*MAX_DEV)
 
 extern eeSet ee;
