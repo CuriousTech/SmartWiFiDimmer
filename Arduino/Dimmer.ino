@@ -551,11 +551,6 @@ void checkQueue()
   }
   if(i == 32) return;
   String url = queue[i].ip.toString();
-  String s = "send ";
-  s += url;
-  s += " ";
-  s += queue[i].sUri;
-  ws.textAll(s);
   jsonPush.begin(url.c_str(), queue[i].sUri.c_str(), queue[i].port, false, false, NULL, NULL);
   jsonPush.addList(jsonListPush);
   queue[i].ip[0] = 0;
@@ -570,11 +565,6 @@ void callQueue(IPAddress ip, String sUri, uint16_t port)
       break;
   }
   if(i == 32) return; // full
-  String s ="set ";
-  s += ip.toString();
-  s += " ";
-  s += sUri;
-  ws.textAll(s);
   queue[i].ip = ip;
   queue[i].sUri = sUri;
   queue[i].port = port;
