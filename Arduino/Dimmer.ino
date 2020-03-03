@@ -44,7 +44,7 @@ SOFTWARE.
 #include "jsonstring.h"
 
 #define ESP_LED    2  // open (ESP-07 low = blue LED on)
-//#define MOTION    14  // Basement=12, LivingRoom=16 RCW-0516, Back switch 14
+//#define MOTION    16  // Basement=12, LivingRoom=16 RCW-0516, Back switch 14
 
 int serverPort = 80;   // listen port
 
@@ -334,6 +334,7 @@ const char *jsonListCmd[] = { "cmd",
   "DIM",
   "OP",
   "DLY", // 30
+  "name",
   NULL
 };
 
@@ -404,12 +405,11 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           ee.dev[dev].IP[0] = 0;
           for(int i = 0; i < MAX_DEV; i++)
           {
-            if(ee.dev[dev].IP[0] == 0)
+            if(ee.dev[i].IP[0] == 0)
             {
               memset(&ee.dev[i], 0, sizeof(Device));
               if( i < MAX_DEV - 1)
                 memmove(&ee.dev[i], &ee.dev[i+1], sizeof(Device) * (MAX_DEV - i));
-              break;
             }
           }
           break;
@@ -478,6 +478,13 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
         case 30: // DLY // delay off (when this one turns on)
           ee.dev[dev].delay = iValue;
           break;
+        case 31: // name
+          if(!strlen(psValue))
+            break;
+          strncpy(ee.szName, psValue, sizeof(ee.szName));
+          eemem.update();
+          ESP.reset();
+          break;
         default:
           break;
       }
@@ -523,18 +530,26 @@ void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
 struct cQ
 {
   IPAddress ip;
-  String sUri;
+  char szUri[100];
   uint16_t port;
 };
-
-cQ queue[32];
+#define CQ_CNT 16
+cQ queue[CQ_CNT];
 
 void checkQueue()
 {
-  static int cnt;
-  if(jsonPush.status() != JC_IDLE) // timeout in asyncClient fails
+  int i;
+  for(i = 0; i < CQ_CNT; i++)
   {
-    if(++cnt > 50)
+    if(queue[i].ip[0])
+      break;
+  }
+  if(i == CQ_CNT) return; // nothing to do
+
+  static int cnt;
+  if(jsonPush.status() != JC_IDLE) // These should be fast, so kill if not
+  {
+    if(++cnt > 200)
     {
       jsonPush.end();
       cnt = 0;
@@ -543,15 +558,7 @@ void checkQueue()
   }
   cnt = 0;
 
-  int i;
-  for(i = 0; i < 32; i++)
-  {
-    if(queue[i].ip[0])
-      break;
-  }
-  if(i == 32) return;
-  String url = queue[i].ip.toString();
-  jsonPush.begin(url.c_str(), queue[i].sUri.c_str(), queue[i].port, false, false, NULL, NULL);
+  jsonPush.begin(queue[i].ip.toString().c_str(), queue[i].szUri, queue[i].port, false, false, NULL, NULL);
   jsonPush.addList(jsonListPush);
   queue[i].ip[0] = 0;
 }
@@ -559,14 +566,14 @@ void checkQueue()
 void callQueue(IPAddress ip, String sUri, uint16_t port)
 {
   int i;
-  for(i = 0; i < 32; i++)
+  for(i = 0; i < CQ_CNT; i++)
   {
     if(queue[i].ip[0] == 0)
       break;
   }
-  if(i == 32) return; // full
+  if(i == CQ_CNT) return; // full
   queue[i].ip = ip;
-  queue[i].sUri = sUri;
+  sUri.toCharArray(queue[i].szUri, sizeof(queue[i].szUri));
   queue[i].port = port;
 }
 
@@ -603,51 +610,50 @@ void CallHost(reportReason r)
 enum dev_mng_type{
   DC_LNK,
   DC_DIM,
-  DC_OP,
+  DC_MOT,
 };
 
 void checkDevs(int dt)
 {
   for(int i = 0; i < MAX_DEV; i++)
   {
-    if(ee.dev[i].IP[0])
+    if(ee.dev[i].IP[0] == 0)
+      break;
+    IPAddress ip(ee.dev[i].IP);
+    String sUri = String("/?key=");
+    sUri += ee.szControlPassword; // assumes all paswords are the same
+    sUri += "&";
+    if(dt == DC_LNK && ee.dev[i].mode)
     {
-      IPAddress ip(ee.dev[i].IP);
-      String sUri = String("/?key=");
-      sUri += ee.szControlPassword; // assumes all paswords are the same
-      sUri += "&";
-      if(dt == DC_LNK && ee.dev[i].mode)
+      if(ee.dev[i].mode == DM_LNK) // turn other on and off
       {
-        if(ee.dev[i].mode == 1) // turn other on or off
+        sUri += "on=";
+        sUri += cont.m_bLightOn;
+      }
+      else if(ee.dev[i].mode == DM_REV) // turn other off if on
+      {
+        if(ee.dev[i].delay) // delayed off
         {
-          sUri += "on=";
-          sUri += cont.m_bLightOn;
+          sUri += "dly=";
+          sUri += ee.dev[i].delay;
         }
-        else // reverse mode
+        else if(cont.m_bLightOn) // instant off
         {
-          if(ee.dev[i].delay) // delayed off
-          {
-            sUri += "dly=";
-            sUri += ee.dev[i].delay;
-          }
-          else if(cont.m_bLightOn) // instant off
-          {
-            sUri += "on=0";
-          }
+          sUri += "on=0";
         }
-        callQueue(ip, sUri, 80);
       }
-      if(dt == DC_DIM && (ee.dev[i].flags&1) ) // link dimmer level
-      {
-        sUri += "level=";
-        sUri += cont.m_nLightLevel;
-        callQueue(ip, sUri, 80);
-      }
-      if(dt == DC_OP && (ee.dev[i].flags&2) ) // test for motion turns on other light
-      {
-        sUri += "on=1";
-        callQueue(ip, sUri, 80);
-      }
+      callQueue(ip, sUri, 80);
+    }
+    if(dt == DC_DIM && (ee.dev[i].flags & DF_DIM) ) // link dimmer level
+    {
+      sUri += "level=";
+      sUri += cont.m_nLightLevel;
+      callQueue(ip, sUri, 80);
+    }
+    if(dt == DC_MOT && (ee.dev[i].flags & DF_MOT) ) // test for motion turns on other light
+    {
+      sUri += "on=1";
+      callQueue(ip, sUri, 80);
     }
   }
 }
@@ -852,7 +858,7 @@ void loop()
       sendState();
     else
       CallHost(Reason_Motion);
-    checkDevs(DC_OP);
+    checkDevs(DC_MOT);
   }
 #endif
 
