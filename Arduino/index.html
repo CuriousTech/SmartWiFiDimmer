@@ -20,11 +20,11 @@ idx=0
 nms=['OFF','ON ','LNK','REV']
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.120/ws")
+//ws=new WebSocket("ws://192.168.0.118/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
-console.log(evt.data)
+//console.log(evt.data)
  lines=evt.data.split(';')
  event=lines[0]
  data=lines[1]
@@ -197,10 +197,15 @@ function clearWh()
   a.wh.value='0.00'
 }
 
+function changeNm()
+{
+  setVar('name',a.nm.value)
+}
+
 function fillData()
 {
   a.TZ.value=data.tz
-  a.nm.innerHTML='<b>'+data.name+'</b>'
+  a.nm.value=data.name
   a.mtime.value=t2hms(data.mot)
   a.auto.value=t2hms(data.auto)
   a.CH.value=data.ch?' ON ':'OFF'
@@ -288,14 +293,12 @@ function changeDev(dev)
 	  setVar('MODE',mode)
  	  break
  	case 'DM':
-      document.getElementById(dev.id).value=(val=='on')?'off':'on'
 	  setVar('DEV',idx[1])
-	  setVar('DIM',(val=='on')?0:1)
+	  setVar('DIM',(document.getElementById(dev.id).checked)?1:0)
  	  break
  	case 'OP':
-      document.getElementById(dev.id).value=(val=='on')?'off':'on'
 	  setVar('DEV',idx[1])
-	  setVar('OP',(val=='on')?0:1)
+	  setVar('OP',(document.getElementById(dev.id).checked)?1:0)
  	  break
  	case 'DLY':
 	  setVar('DEV',idx[1])
@@ -340,7 +343,7 @@ function AddDev(arr)
   inp=document.createElement("input")
   inp.id='DM-'+idx
   inp.type='checkbox'
-  inp.value=(arr[3]&1)?'on':'off'
+  inp.checked=(arr[3]&1)?1:0
   inp.size=2
   inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
@@ -348,7 +351,7 @@ function AddDev(arr)
   inp=document.createElement("input")
   inp.id='OP-'+idx
   inp.type='checkbox'
-  inp.value=(arr[3]&2)?'on':'off'
+  inp.checked=(arr[3]&2)?1:0
   inp.size=2
   inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
@@ -365,7 +368,7 @@ function AddDev(arr)
   inp.id='DL-'+idx
   inp.type='button'
   inp.value='X'
-  inp.onchange=function(){changeDev(this); }
+  inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
 
   tr=document.createElement("tr")
@@ -386,7 +389,7 @@ fillData()
 }"
 >
 <table align="right" width="450">
-<tr><td>Light</td><td>LED1 &nbsp LED2</td><td><div id="nm"></div></td><td><div id="time"></div></td></tr>
+<tr><td>Light</td><td>LED1 &nbsp LED2</td><td><input id="nm" type=text size=8 onchange="changeNm();"></td><td><div id="time"></div></td></tr>
 <tr><td><input name="RLY" value="OFF" type='button' onclick="{manual()}"></td>
 <td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
 <td colspan=2><label for="CH">Rpt<input name="CH" value="OFF" type='button' onclick="{togCall()}"> <label for="auto"> Auto Off </label><input name="auto" type="text" value="0" size="4"> &nbsp <label for="TZ">TZ </label><input name="TZ" type=text size=1 value='-5'></td></tr>
