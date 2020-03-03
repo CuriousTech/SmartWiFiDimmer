@@ -29,13 +29,24 @@ struct Sched          // User set schedule item
 #define MAX_SCHED 50
 #define MAX_DEV 20
 
+enum DEV_FLAGS{
+  DF_DIM = 1,
+  DF_MOT = (1<<1),
+};
+
+enum DEV_MODE{
+  DM_OFF,
+  DM_LNK,
+  DM_REV,
+};
+
 struct Device
 {
   char szName[32];
   uint8_t IP[4];
   uint16_t delay;
-  uint8_t mode;
-  uint8_t flags;
+  uint8_t mode; // DEV_MODE
+  uint8_t flags; // DEV_FLAGS
 }; // 40
 
 struct eeSet // EEPROM backed data
