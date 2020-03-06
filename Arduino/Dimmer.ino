@@ -44,7 +44,7 @@ SOFTWARE.
 #include "jsonstring.h"
 
 #define ESP_LED    2  // open (ESP-07 low = blue LED on)
-//#define MOTION    16  // Basement=12, LivingRoom=16 RCW-0516, Back switch 14
+//#define MOTION    12  // Basement=12, LivingRoom=16 RCW-0516, Back switch 14
 
 int serverPort = 80;   // listen port
 
@@ -137,7 +137,7 @@ void parseParams(AsyncWebServerRequest *request)
 
   IPAddress ip = request->client()->remoteIP();
 
-  if(strcmp(ee.szControlPassword, password))
+  if(strcmp(ee.szControlPassword, password) || nWrongPass)
   {
     if(nWrongPass == 0) // it takes at least 10 seconds to recognize a wrong password
       nWrongPass = 10;
@@ -546,19 +546,10 @@ void checkQueue()
   }
   if(i == CQ_CNT) return; // nothing to do
 
-  static int cnt;
   if(jsonPush.status() != JC_IDLE) // These should be fast, so kill if not
-  {
-    if(++cnt > 200)
-    {
-      jsonPush.end();
-      cnt = 0;
-    }
     return;
-  }
-  cnt = 0;
 
-  jsonPush.begin(queue[i].ip.toString().c_str(), queue[i].szUri, queue[i].port, false, false, NULL, NULL);
+  jsonPush.begin(queue[i].ip.toString().c_str(), queue[i].szUri, queue[i].port, false, false, NULL, NULL, 300);
   jsonPush.addList(jsonListPush);
   queue[i].ip[0] = 0;
 }
@@ -802,7 +793,7 @@ void loop()
 
   static uint8_t nOldLevel;
   static uint32_t tm;
-  if(cont.m_nLightLevel != nOldLevel && !Serial.available() && (millis() - tm > 120) ) // new level from MCU & no new serial data
+  if(cont.m_nLightLevel != nOldLevel && !Serial.available() && (millis() - tm > 200) ) // new level from MCU & no new serial data
   {
     sendState();
     CallHost(Reason_Level);
