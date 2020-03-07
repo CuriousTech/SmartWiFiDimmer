@@ -10,7 +10,6 @@ public:
   void listen(void);
   void init(void);
   void setSwitch(bool bOn);
-  void setLevel(void);
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
 
