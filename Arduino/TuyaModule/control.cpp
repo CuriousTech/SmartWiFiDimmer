@@ -18,45 +18,19 @@ void swControl::init()
 
 void swControl::listen()
 {
-  static uint8_t inBuffer[52];
-  static uint8_t idx;
-  
-  while(Serial.available())
-  {
-    uint8_t c = Serial.read();
-    inBuffer[idx++] = c;
-    inBuffer[idx] = 0;
-    if(c == 0x0A || idx > 20)
-    {
-      idx = 0;
-    }
-  }
-
-  if (m_nNewLightLevel != m_nLightLevel) // new requested level
-  {
-    m_nLightLevel = m_nNewLightLevel;
-    setLevel();
-  }
-
   uint8_t s = second();
   static uint8_t ls;
   if(s != ls) // Fix for light turning on at 50% randomly
   {
     ls = s;
-    setSwitch(m_bLightOn);
+    uint8_t data = map(m_nLightLevel, 1, 100, nLevelMin, nLevelMax);
+    writeSerial( m_bLightOn ? data : 0);
   }
 }
 
 void swControl::setSwitch(bool bOn)
 {
-  writeSerial( bOn ? m_nLightLevel : 0);
   m_bLightOn = bOn;
-}
-
-void swControl::setLevel()
-{
-  uint8_t data = map(m_nLightLevel, 1, 100, nLevelMin, nLevelMax);
-  writeSerial(data);
 }
 
 bool swControl::writeSerial(uint8_t level)
