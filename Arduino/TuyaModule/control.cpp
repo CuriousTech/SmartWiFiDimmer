@@ -2,7 +2,6 @@
 
 #include "control.h"
 #include <TimeLib.h>
-#include "eeMem.h"
 
 #define SWITCH_IN 13
 
@@ -18,9 +17,48 @@ void swControl::init()
 
 void swControl::listen()
 {
+  // handle 60Hz AC switch input (low pulse while pressed)
+  static int cnt;
+  static uint32_t tm;
+  static int8_t nDirection;
+  if(digitalRead(SWITCH_IN) == LOW) // catches at around 20-400ms
+  {
+    cnt++;
+    tm = millis();
+    if(cnt > 4) // holding
+    {
+      if(nDirection == 0) // set direction
+      {
+        if(m_bLightOn == false)
+          m_bLightOn = true;
+        if(m_nLightLevel < 100)
+            nDirection = 1; // up
+        else
+            nDirection = 2; // down
+      }
+      if(nDirection == 1)
+      {
+        if(m_nLightLevel < 100)
+          m_nLightLevel++;
+      }
+      else
+      {
+        if(m_nLightLevel > 1)
+          m_nLightLevel--;
+      }
+    }
+  }
+  else if((millis() - tm) > 500 && cnt) // >500ms = release
+  {
+    if(cnt <= 4) // short tap (~100ms)
+      m_bLightOn = !m_bLightOn;
+    cnt = 0;
+//    nDirection = 0; // reset will be up next time
+  }
+
   uint8_t s = second();
   static uint8_t ls;
-  if(s != ls) // Fix for light turning on at 50% randomly
+  if(s != ls) // Set new light value every second
   {
     ls = s;
     uint8_t data = map(m_nLightLevel, 1, 100, nLevelMin, nLevelMax);
@@ -49,7 +87,7 @@ bool swControl::writeSerial(uint8_t level)
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, 1, 100);
+  m_nLightLevel = constrain(n, 1, 100);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
