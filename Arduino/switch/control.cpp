@@ -48,7 +48,6 @@ void swControl::listen()
 void swControl::setSwitch(bool bOn)
 {
   digitalWrite(RELAY, bOn);
-  digitalWrite(TOUCH_LED, bOn ? LOW:HIGH);
   m_bLightOn = bOn;
 }
 
