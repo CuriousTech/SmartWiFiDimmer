@@ -16,7 +16,7 @@ public:
   bool    m_bLightOn;      // state
   bool    m_bLED[2];
   uint8_t m_nLightLevel = 50; // current level
-  const uint8_t nLevelMin = 0;
+  const uint8_t nLevelMin = 16; // flickers below about 15
   const uint8_t nLevelMax = 255;
 private:
   bool writeSerial(uint8_t level);
