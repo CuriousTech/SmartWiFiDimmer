@@ -44,7 +44,7 @@ SOFTWARE.
 #include "jsonstring.h"
 
 #define ESP_LED    2  // open (ESP-07 low = blue LED on)
-//#define MOTION    12  // Basement=12, LivingRoom=16 RCW-0516, Back switch 14
+//#define MOTION    14 // Basement=12, LivingRoom=16 RCW-0516, Back switch=14
 
 int serverPort = 80;   // listen port
 
@@ -100,7 +100,7 @@ String dataJson()
   js.Var("on", cont.m_bLightOn);
   js.Var("l1", ee.bLED[0]);
   js.Var("l2", ee.bLED[1]);
-  js.Var("lvl", constrain(cont.m_nLightLevel, 1, 100));
+  js.Var("lvl", cont.m_nLightLevel);
   js.Var("tr", nSecTimer);
   js.Var("sn", nSched);
   js.Var("rssi", WiFi.RSSI());
@@ -530,7 +530,7 @@ void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
 struct cQ
 {
   IPAddress ip;
-  char szUri[100];
+  String sUri;
   uint16_t port;
 };
 #define CQ_CNT 16
@@ -538,6 +538,15 @@ cQ queue[CQ_CNT];
 
 void checkQueue()
 {
+  static uint32_t cqTime;
+
+  if(jsonPush.status() != JC_IDLE) // These should be fast, so kill if not
+  {
+    if( (millis() - cqTime) > 500)
+      jsonPush.end();
+    return;
+  }
+
   int i;
   for(i = 0; i < CQ_CNT; i++)
   {
@@ -546,11 +555,9 @@ void checkQueue()
   }
   if(i == CQ_CNT) return; // nothing to do
 
-  if(jsonPush.status() != JC_IDLE) // These should be fast, so kill if not
-    return;
-
-  jsonPush.begin(queue[i].ip.toString().c_str(), queue[i].szUri, queue[i].port, false, false, NULL, NULL, 300);
+  jsonPush.begin(queue[i].ip.toString().c_str(), queue[i].sUri.c_str(), queue[i].port, false, false, NULL, NULL, 300);
   jsonPush.addList(jsonListPush);
+  cqTime = millis();
   queue[i].ip[0] = 0;
 }
 
@@ -564,7 +571,7 @@ void callQueue(IPAddress ip, String sUri, uint16_t port)
   }
   if(i == CQ_CNT) return; // full
   queue[i].ip = ip;
-  sUri.toCharArray(queue[i].szUri, sizeof(queue[i].szUri));
+  queue[i].sUri = sUri;
   queue[i].port = port;
 }
 
@@ -742,6 +749,8 @@ void setup()
     jsonString js;
     js.Var("time", now() - ( (ee.tz + utime.getDST() ) * 3600) );
     js.Var("ppkw", ee.ppkw );
+    js.Var("on", cont.m_bLightOn );
+    js.Var("level", cont.m_nLightLevel );
     request->send(200, "text/plain", js.Close());
   });
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -771,8 +780,21 @@ void setup()
 #endif
   if(wifi.isCfg() == false && ee.ntpServer[0])
     utime.start();
-  cont.m_nLightLevel = ee.nLightLevel;
+  cont.setLevel(ee.nLightLevel);
   cont.setSwitch(ee.bLightOn);
+  changeLEDs(ee.bLightOn);
+}
+
+void changeLEDs(bool bOn)
+{
+  if(ee.bLED[0] == 2)
+    cont.setLED(0, bOn); // link
+  else if(ee.bLED[0] == 3)
+    cont.setLED(0, bOn ? false:true); // reverse
+  if(ee.bLED[1] == 2)
+    cont.setLED(1, bOn); // link
+  else if(ee.bLED[1] == 3)
+    cont.setLED(1, bOn ? false:true); // reverse
 }
 
 void loop()
@@ -806,14 +828,7 @@ void loop()
   if(cont.m_bLightOn != bOldOn)
   {
     bOldOn = cont.m_bLightOn;
-    if(ee.bLED[0] == 2)
-      cont.setLED(0, bOldOn); // link
-    else if(ee.bLED[0] == 3)
-      cont.setLED(0, bOldOn ? false:true); // reverse
-    if(ee.bLED[1] == 2)
-      cont.setLED(1, bOldOn); // link
-    else if(ee.bLED[1] == 3)
-      cont.setLED(1, bOldOn ? false:true); // reverse
+    changeLEDs(bOldOn);
     CallHost(Reason_Switch);
     sendState();
     if(nSched && cont.m_bLightOn)
@@ -861,7 +876,7 @@ void loop()
     if(wifi.isCfg())
     {
       wifi.seconds();
-      cont.setLED(0, !cont.m_bLED ); // blink for config
+      cont.setLED(0, !cont.m_bLED[0] ); // blink for config
     }
 
     if(min_save != minute())    // only do stuff once per minute
