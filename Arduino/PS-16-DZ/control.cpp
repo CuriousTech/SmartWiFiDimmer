@@ -1,4 +1,5 @@
 // Class for controlling toggle dimmer (esp8285 / PS-16-DZ / eWeLink)
+// https://usa.testzon.com/product/48861
 
 #include "control.h"
 #include <TimeLib.h>
