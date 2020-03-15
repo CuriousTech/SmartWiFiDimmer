@@ -1,4 +1,5 @@
-// Class for controlling capacitive touch (center LED bar) dimmer
+// Class for controlling capacitive touch (center LED bar) dimmer (MOES)
+// https://www.newegg.com/moes-ds01-1/p/0R7-00MY-00013
 
 #include "control.h"
 #include <TimeLib.h>
@@ -180,6 +181,11 @@ void swControl::setLED(uint8_t no, bool bOn)
 {
   uint8_t data[1];
   m_bLED[no] = bOn;
-  data[0] = bOn ? 2:3; // 0/1=red blink, 2=red, 3=white glow/off white on
+  if(m_bLED[0] == 0 || m_bLED[1] == 0)
+    data[0] = 3; // white glow
+  else if(m_bLED[0])
+    data[0] = 2; // red
+  else if(m_bLED[1])
+    data[0] = 1; // red blink
   writeSerial(3, data, 1);
 }
