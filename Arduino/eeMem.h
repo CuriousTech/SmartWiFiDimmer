@@ -74,7 +74,8 @@ struct eeSet // EEPROM backed data
   uint32_t nTotalSeconds;
   Sched    schedule[MAX_SCHED];  // 50*28
   struct Device dev[MAX_DEV];
-  uint8_t res[2];
+  uint8_t motionPin;
+  uint8_t res;
 }; // 1612 + (40*MAX_DEV)
 
 extern eeSet ee;
