@@ -24,7 +24,7 @@ ws=new WebSocket("ws://"+window.location.host+"/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
-//console.log(evt.data)
+console.log(evt.data)
  lines=evt.data.split(';')
  event=lines[0]
  data=lines[1]
@@ -48,6 +48,9 @@ ws.onmessage=function(evt){
 	 a.LVL.style.visibility='hidden'
 	 a.level.style.visibility='hidden'
 	 a.lbl.style.visibility='hidden'
+	 for(i=0;i<item.length;i++)
+	  document.getElementById('L'+i).style.visibility='hidden'
+	 a.header.innerHTML='<small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; '
 	}
 //	if(+d.wh > 100000)
 //		a.wh.value=d.wh.toFixed(0)
@@ -286,9 +289,9 @@ function changeDev(dev)
  	  break
  	case 'ON':
  	  mode=0
-      if(val=='---'){ document.getElementById(dev.id).value='LNK'; mode=1}
+      if(val=='------'){ document.getElementById(dev.id).value='LNK'; mode=1}
       else if(val=='LNK'){document.getElementById(dev.id).value='REV'; mode=2}
- 	  else document.getElementById(dev.id).value='---'
+ 	  else document.getElementById(dev.id).value='------'
 	  setVar('DEV',idx[1])
 	  setVar('MODE',mode)
  	  break
@@ -308,6 +311,10 @@ function changeDev(dev)
 	  setVar('DEV',idx[1])
 	  setVar('DEL',0)
  	  break
+ 	case 'GO':
+ 	  s=document.getElementById('IP-'+idx[1]).value
+ 	  window.location.href='http://'+s
+ 	  break
  }
 }
 
@@ -315,6 +322,14 @@ function changeDev(dev)
 function AddDev(arr)
 {
   td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.id='GO-'+idx
+  inp.type='button'
+  inp.size=2
+  inp.value='GO'
+  inp.onclick=function(){changeDev(this); }
+  td.appendChild(inp)
+
   inp=document.createElement("input")
   inp.id='DE-'+idx
   inp.type='text'
@@ -334,7 +349,7 @@ function AddDev(arr)
   inp=document.createElement("input")
   inp.id='ON-'+idx
   inp.type='button'
-  nams=['---','LNK','REV']
+  nams=['------','LNK','REV']
   inp.value=nams[arr[2]]
   inp.size=3
   inp.onclick=function(){changeDev(this); }
@@ -397,7 +412,7 @@ fillData()
 <td colspan=4><label for="LVL" id="lbl">Level </label><input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min=1 max=100 onchange="slide();">  &nbsp
  &nbsp <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
 
-<tr><td>Name &nbsp </td><td colspan=3><small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration Level</td></tr>
+<tr><td>Name &nbsp </td><td colspan=3><div id="header"><small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration Level</div></td></tr>
 </table>
 <table align="right" style="font-size:small" id="list"></table>
 <table width="450" align="right" style="font-size:small" id="dev"></table>
