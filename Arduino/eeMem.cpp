@@ -26,7 +26,8 @@ eeSet ee = {              // Defaults for blank EEPROM
     { 14*60, 120*60, 254, 20, "Something"},
   },
   {0}, // devices
-  {0}
+  0, // motionPin  Basement=12, LivingRoom=16 RCW-0516, Back switch=14
+  0
 }; // 24xx
 
 eeMem::eeMem()
