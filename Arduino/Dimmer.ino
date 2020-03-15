@@ -44,7 +44,6 @@ SOFTWARE.
 #include "jsonstring.h"
 
 #define ESP_LED    2  // open (ESP-07 low = blue LED on)
-//#define MOTION    14 // Basement=12, LivingRoom=16 RCW-0516, Back switch=14
 
 int serverPort = 80;   // listen port
 
@@ -96,6 +95,7 @@ void totalUpWatts()
 String dataJson()
 {
   jsonString js("state");
+  js.Var("name", ee.szName);
   js.Var("t", now() - ( (ee.tz + utime.getDST() ) * 3600) );
   js.Var("on", cont.m_bLightOn);
   js.Var("l1", ee.bLED[0]);
@@ -107,9 +107,8 @@ String dataJson()
   totalUpWatts();
   js.Var("wh", ee.fTotalWatts );
   js.Var("ts", ee.nTotalSeconds);
-#ifdef MOTION
-  js.Var("mo", digitalRead(MOTION));
-#endif
+  if(ee.motionPin)
+    js.Var("mo", digitalRead(ee.motionPin));
   return js.Close();
 }
 
@@ -167,6 +166,7 @@ void parseParams(AsyncWebServerRequest *request)
     "hostip",
     "ntp",
     "port", // 10
+    "motpin",
     "",
   };
 
@@ -238,6 +238,9 @@ void parseParams(AsyncWebServerRequest *request)
         break;
       case 10: // host port
         ee.hostPort = s.toInt() ? s.toInt():80;
+        break;
+      case 11: // motpin
+        ee.motionPin = s.toInt();
         break;
     }
   }
@@ -335,6 +338,7 @@ const char *jsonListCmd[] = { "cmd",
   "OP",
   "DLY", // 30
   "name",
+  "motpin",
   NULL
 };
 
@@ -471,7 +475,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           ee.dev[dev].flags &= ~1; // define this later
           ee.dev[dev].flags |= iValue;
           break;
-        case 29: // OP (flaf 2) // next option?
+        case 29: // MOT (flag 2) // motion to other switch
           ee.dev[dev].flags &= ~2; // define this later
           ee.dev[dev].flags |= (iValue << 1);
           break;
@@ -484,6 +488,9 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           strncpy(ee.szName, psValue, sizeof(ee.szName));
           eemem.update();
           ESP.reset();
+          break;
+        case 32: // motpin
+          ee.motionPin = iValue;
           break;
         default:
           break;
@@ -539,13 +546,18 @@ cQ queue[CQ_CNT];
 void checkQueue()
 {
   static uint32_t cqTime;
+  static uint8_t cnt;
 
   if(jsonPush.status() != JC_IDLE) // These should be fast, so kill if not
   {
     if( (millis() - cqTime) > 500)
       jsonPush.end();
+    cnt = 20;
     return;
   }
+  if(cnt) // delay to fix a bug (previous IP gets used)
+    if(--cnt)
+      return;
 
   int i;
   for(i = 0; i < CQ_CNT; i++)
@@ -559,6 +571,7 @@ void checkQueue()
   jsonPush.addList(jsonListPush);
   cqTime = millis();
   queue[i].ip[0] = 0;
+  queue[i].sUri = "";
 }
 
 void callQueue(IPAddress ip, String sUri, uint16_t port)
@@ -589,6 +602,7 @@ void CallHost(reportReason r)
     case Reason_Setup:
       sUri += "setup&port="; sUri += serverPort;
       sUri += "&on="; sUri += cont.m_bLightOn;
+      sUri += "&level="; sUri += cont.m_nLightLevel;
       break;
     case Reason_Switch:
       sUri += "switch&on="; sUri += cont.m_bLightOn;
@@ -841,32 +855,33 @@ void loop()
     checkDevs(DC_LNK);
   }
 
-#ifdef MOTION
-  bool bMot = digitalRead(MOTION);
-  if(bMot != bMotion)
+  if(ee.motionPin)
   {
-    bMotion = bMot;
-    if(bMot) // got motion
-    { // timing enabled   currently off
-      if(ee.nMotionSecs && bEnMot)
-      {
-        if(nSecTimer < ee.nMotionSecs) // skip if schedule is active and higher
-          nSecTimer = ee.nMotionSecs; // reset if on
-        if(cont.m_bLightOn == false) // turn on
+    bool bMot = digitalRead(ee.motionPin);
+    if(bMot != bMotion)
+    {
+      bMotion = bMot;
+      if(bMot) // got motion
+      { // timing enabled   currently off
+        if(ee.nMotionSecs && bEnMot)
         {
-          cont.setSwitch(true);
-          if(ee.autoTimer)
-            nSecTimer = ee.autoTimer;
+          if(nSecTimer < ee.nMotionSecs) // skip if schedule is active and higher
+            nSecTimer = ee.nMotionSecs; // reset if on
+          if(cont.m_bLightOn == false) // turn on
+          {
+            cont.setSwitch(true);
+            if(ee.autoTimer)
+              nSecTimer = ee.autoTimer;
+          }
         }
       }
+      if(bMot == false)
+        sendState();
+      else
+        CallHost(Reason_Motion);
+      checkDevs(DC_MOT);
     }
-    if(bMot == false)
-      sendState();
-    else
-      CallHost(Reason_Motion);
-    checkDevs(DC_MOT);
   }
-#endif
 
   checkQueue();
   if(sec_save != second()) // only do stuff once per second
