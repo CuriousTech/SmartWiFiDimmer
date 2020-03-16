@@ -181,7 +181,7 @@ void swControl::setLED(uint8_t no, bool bOn)
 {
   uint8_t data[1];
   m_bLED[no] = bOn;
-  if(m_bLED[0] == 0 || m_bLED[1] == 0)
+  if(m_bLED[0] == 0 && m_bLED[1] == 0)
     data[0] = 3; // white glow
   else if(m_bLED[0])
     data[0] = 2; // red
