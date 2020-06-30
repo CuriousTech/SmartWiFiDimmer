@@ -58,6 +58,7 @@ struct eeSet // EEPROM backed data
   char     ntpServer[32]; // ntp server URL
   uint16_t udpPort;       // udp port
   int8_t   tz;            // Timezone offset
+  int8_t   res1;
   char     szControlPassword[32];
   uint8_t  hostIP[4];
   uint16_t hostPort;
@@ -65,6 +66,7 @@ struct eeSet // EEPROM backed data
   uint32_t autoTimer;
   uint16_t nMotionSecs;
   bool     bCall;        // use callHost
+  int8_t   startMode;
   uint8_t  bLED[2]; // 212
   uint16_t watts;
   uint16_t ppkw;
@@ -72,6 +74,8 @@ struct eeSet // EEPROM backed data
   uint8_t  nLightLevel;
   float    fTotalWatts;
   uint32_t nTotalSeconds;
+  uint32_t nTotalStart;
+  uint32_t res32;
   Sched    schedule[MAX_SCHED];  // 50*28
   struct Device dev[MAX_DEV];
   uint8_t motionPin;
