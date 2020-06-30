@@ -8,6 +8,8 @@
 
 extern UdpTime utime;
 
+//extern void WsSend(String s);
+
 swControl::swControl()
 {
 }
@@ -15,7 +17,7 @@ swControl::swControl()
 void swControl::init()
 {
   Serial.begin(9600);
-  Serial.swap();
+//  Serial.swap(); // v1.1 (garage) uses default serial
   checkStatus();
 }
 
@@ -25,30 +27,39 @@ void swControl::checkStatus()
   m_cs = 15;
 }
 
+uint8_t swControl::getPower()
+{
+  return map(m_nLightLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
+}
+
 void swControl::listen()
 {
   static uint8_t inBuffer[52];
   static uint8_t idx;
+  static uint8_t v;
   static uint8_t state;
   static uint8_t cmd;
   static uint16_t len;
   uint8_t n;
-  
+
   while(Serial.available())
   {
     uint8_t c = Serial.read();
     switch(state)
     {
-      case 0:     // data packet: 55 AA cmd cmd 00 len d0 d1 d2.... chk
+      case 0:     // data packet: 55 AA vers cmd 00 len d0 d1 d2.... chk
         if(c == 0x55)
           state = 1;
+        else if(c == 0xAA)
+          state = 2;
         break;
       case 1:
         if(c == 0xAA)
           state = 2;
         break;
       case 2:
-        // version
+        // version 3
+        v = c;
         state = 3;
         break;
       case 3:
@@ -68,37 +79,41 @@ void swControl::listen()
         inBuffer[idx++] = c; // get length + checksum
         if(idx > len || idx >= sizeof(inBuffer) )
         {
-          switch(cmd)
+          uint8_t chk = 0xFF + len + v + cmd;
+          for(int a = 0; a < len; a++)
+            chk += inBuffer[a];
+          if( inBuffer[len] == chk) // good checksum
           {
-            case 0: // heartbeat
-              break;
-            case 1: // product ID (51 bytes)
-              break;
-            case 2: // ack for MCU conf
-              break;
-            case 3: // ack for WiFi state
-              break;
-            case 5: // respond to WiFi select (ACK)
-              writeSerial(5);
-              break;
-            case 7: // light state
-              switch(len)
-              {
-                case 5: // 01 01 00 01 01 on
-                  m_bLightOn = inBuffer[4];
-                  break;
-                case 8: // 03 02 00 04 00 ?? 00 lvl
-                  m_nNewLightLevel = m_nLightLevel =
-                    map(inBuffer[7], nLevelMin, nLevelMax, 0, 100);
-
-                  break;
-              }
-              break;
+            switch(cmd)
+            {
+              case 0: // heartbeat
+                break;
+              case 1: // product ID (51 bytes)
+                break;
+              case 2: // ack for MCU conf
+                break;
+              case 3: // ack for WiFi state
+                break;
+              case 5: // respond to WiFi select (ACK)
+                writeSerial(5);
+                break;
+              case 7: // light state
+                switch(len)
+                {
+                  case 5: // 01 01 00 01 01 on
+                    m_bLightOn = inBuffer[4];
+                    break;
+                  case 8: // 03 02 00 04 00 ?? 00 lvl
+                    m_nNewLightLevel = m_nLightLevel =
+                      map(inBuffer[7], nLevelMin, nLevelMax, 1, 200);
+                    break;
+                  default:
+                    break;
+                }
+                break;
+            }
           }
-
           state = 0;
-          idx = 0;
-          len = 0;
         }
         break;
     }
@@ -146,7 +161,7 @@ void swControl::setLevel()
   data[4] = 0;
   data[5] = 0; // 32 bit value
   data[6] = 0;
-  data[7] = map(m_nLightLevel, 0, 100, nLevelMin, nLevelMax);
+  data[7] = map(m_nLightLevel, 1, 200, nLevelMin, nLevelMax);
   writeSerial(6, data, 8);
 }
 
@@ -174,7 +189,7 @@ bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint8_t len)
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, 0, 100);
+  m_nNewLightLevel = constrain(n, 1, 200);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
