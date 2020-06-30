@@ -20,6 +20,11 @@ void swControl::init()
   pinMode(RELAY, OUTPUT);
 }
 
+uint8_t swControl::getPower()
+{
+  return 100;  // no reduction
+}
+
 void swControl::listen()
 {
   static bool bBtnState = true;
@@ -49,10 +54,6 @@ void swControl::setSwitch(bool bOn)
 {
   digitalWrite(RELAY, bOn);
   m_bLightOn = bOn;
-}
-
-void swControl::setLevel()
-{
 }
 
 void swControl::setLevel(uint8_t n)
