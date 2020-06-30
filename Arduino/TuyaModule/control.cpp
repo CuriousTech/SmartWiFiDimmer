@@ -2,6 +2,7 @@
 
 #include "control.h"
 #include <TimeLib.h>
+#include "eeMem.h"
 
 #define SWITCH_IN 13
 
@@ -13,6 +14,11 @@ swControl::swControl()
 void swControl::init()
 {
   Serial.begin(9600);
+}
+
+uint8_t swControl::getPower()
+{
+  return map(m_nLightLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
 }
 
 void swControl::listen()
@@ -31,14 +37,14 @@ void swControl::listen()
       {
         if(m_bLightOn == false)
           m_bLightOn = true;
-        if(m_nLightLevel < 100)
+        if(m_nLightLevel < 200)
             nDirection = 1; // up
         else
             nDirection = 2; // down
       }
       if(nDirection == 1)
       {
-        if(m_nLightLevel < 100)
+        if(m_nLightLevel < 200)
           m_nLightLevel++;
       }
       else
@@ -61,10 +67,11 @@ void swControl::listen()
   if(s != ls) // Set new light value every second
   {
     ls = s;
-    uint8_t data = map(m_nLightLevel, 1, 100, nLevelMin, nLevelMax);
+    uint8_t data = map(m_nLightLevel, 1, 200, nLevelMin, nLevelMax);
     writeSerial( m_bLightOn ? data : 0);
   }
-}
+ 
+ }
 
 void swControl::setSwitch(bool bOn)
 {
@@ -87,7 +94,7 @@ bool swControl::writeSerial(uint8_t level)
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nLightLevel = constrain(n, 1, 100);
+  m_nNewLightLevel = constrain(n, 1, 200);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
