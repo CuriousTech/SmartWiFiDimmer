@@ -15,17 +15,16 @@ public:
   void listen(void);
   void init(void);
   void setSwitch(bool bOn);
-  void setLevel(void);
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
+  uint8_t getPower(void);
 
   bool    m_bLightOn;      // state
   bool    m_bLED[2];
   int8_t m_nLightLevel = 0; // current level
   const uint8_t nLevelMin = 0;
   const uint8_t nLevelMax = 0; // no dimmer
-private:
-  uint8_t m_nNewLightLevel = 0; // set in a callback
+  const uint8_t nWattMin = 100; // switch
 };
 
 #endif // CONTROL_H
