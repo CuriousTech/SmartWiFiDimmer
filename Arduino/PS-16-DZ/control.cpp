@@ -1,4 +1,4 @@
-// Class for controlling toggle dimmer (esp8285 / PS-16-DZ / eWeLink)
+// Class for controlling paddle dimmer (esp8285 / PS-16-DZ / eWeLink)
 // https://usa.testzon.com/product/48861
 
 #include "control.h"
@@ -17,6 +17,11 @@ void swControl::init()
   digitalWrite(WIFI_LED, HIGH);
   pinMode(WIFI_LED, OUTPUT);
   Serial.begin(19200);
+}
+
+uint8_t swControl::getPower()
+{
+  return map(m_nLightLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
 }
 
 void swControl::listen()
@@ -40,7 +45,7 @@ void swControl::listen()
       }
       if((p = strstr(inBuffer, "bright")) != NULL) // "bright":99
       {
-        m_nNewLightLevel = atoi(p + 8); // 10-99
+        m_nNewLightLevel = map(atoi(p + 8), nLevelMin, nLevelMax, 0, 200); // 10-99
         m_nLightLevel = m_nNewLightLevel;
       }
       String s;
@@ -86,7 +91,7 @@ void swControl::setLevel()
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, nLevelMin, nLevelMax);
+  m_nNewLightLevel = constrain(n, 0, 200);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
