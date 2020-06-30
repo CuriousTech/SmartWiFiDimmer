@@ -25,6 +25,11 @@ void swControl::checkStatus()
   m_cs = 15;
 }
 
+uint8_t swControl::getPower()
+{
+  return map(m_nLightLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
+}
+
 void swControl::listen()
 {
   static uint8_t inBuffer[32];
@@ -82,8 +87,9 @@ void swControl::listen()
                   m_bLightOn = inBuffer[4];
                   break;
                 case 8: // 02 02 00 04 00 ?? 00 93
-                  m_nNewLightLevel = m_nLightLevel =
-                    map(inBuffer[7], nLevelMin, nLevelMax, 1, 100);
+                  m_nLightLevel = map(inBuffer[7], nLevelMin, nLevelMax, 1, 200);
+                  if(m_nLightLevel == 0) m_nLightLevel = 1;
+                  m_nNewLightLevel = m_nLightLevel;
                   break;
               }
               break;
@@ -139,7 +145,7 @@ void swControl::setLevel()
   data[4] = 0;
   data[5] = 0; // not sure
   data[6] = 0;
-  data[7] = map(m_nLightLevel, 0, 100, nLevelMin, nLevelMax);
+  data[7] = map(m_nLightLevel, 1, 200, nLevelMin, nLevelMax);
   writeSerial(6, data, 8);
 }
 
@@ -167,7 +173,7 @@ bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint8_t len)
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, 0, 100);
+  m_nNewLightLevel = constrain(n, 0, 200);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
