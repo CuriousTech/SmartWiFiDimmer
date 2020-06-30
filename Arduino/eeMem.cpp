@@ -6,20 +6,24 @@ eeSet ee = {              // Defaults for blank EEPROM
   0xAAAA,
   "",  // saved SSID
   "", // router password
-  "0.us.pool.ntp.org", 2390, -5, // NTP server, udp port, TZ
-  "password", // device password for control
+  "", 2390, -5, // NTP server, udp port, TZ
+  0, // res1
+  "esp8266ct", // device password for control
   {192,168,0,100}, 80, // host IP and port
-  "Basement",
+  "Garage",
   0, // autoTimer
   0, // motionSecs
   true, // report
+  0, // startMode
   {0, 0}, // LED1
-  19, // watts for device
-  133, // 15 cents per KWH
+  75, // watts for device
+  143, // 15 cents per KWH
   false,
-  50,
+  100, // level
   0, // total watts used
   0, // total seconds
+  0, // total start time
+  0,
   {
     {  6*60,  10*60, 254, 100, "Morning"},  // time, seconds, wday, level, name
     { 12*60,  60*60, 254, 60, "Lunch"},
