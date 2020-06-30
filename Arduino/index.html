@@ -4,12 +4,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>WiFi Dimmer</title>
 <style>div,input{margin-bottom: 5px;}
-table,input{border-radius: 5px;box-shadow: 2px 2px 12px #000000;
-background-image: -moz-linear-gradient(top, #ffffff, #50a0ff);
-background-image: -ms-linear-gradient(top, #ffffff, #50a0ff);
-background-image: -o-linear-gradient(top, #ffffff, #50a0ff);
-background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
-background-image: linear-gradient(top, #ffffff, #50a0ff);
+table{border-radius: 5px;box-shadow: 2px 2px 12px #000000;
+background-image: -moz-linear-gradient(top, #ffffff, #4080ff);
+background-image: -ms-linear-gradient(top, #ffffff, #4080ff);
+background-image: -o-linear-gradient(top, #ffffff, #4080ff);
+background-image: -webkit-linear-gradient(top, #ffffff, #4080ff);
+background-image: linear-gradient(top, #ffffff, #4080ff);
+background-clip: padding-box;}
+input{border-radius: 5px;box-shadow: 2px 2px 12px #000000;
+background-image: -moz-linear-gradient(top, #ffffff, #505050);
+background-image: -ms-linear-gradient(top, #ffffff, #505050);
+background-image: -o-linear-gradient(top, #ffffff, #505050);
+background-image: -webkit-linear-gradient(top, #ffffff, #2070a0);
+background-image: linear-gradient(top, #ffffff, #505050);
 background-clip: padding-box;}
 body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
 </style>
@@ -20,11 +27,11 @@ idx=0
 nms=['OFF','ON ','LNK','REV']
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.118/ws")
+//ws=new WebSocket("ws://192.168.0.102/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
-console.log(evt.data)
+//console.log(evt.data)
  lines=evt.data.split(';')
  event=lines[0]
  data=lines[1]
@@ -42,22 +49,17 @@ console.log(evt.data)
 	a.LVL.value=d.lvl
 	a.level.value=d.lvl
 	a.rssi.innerHTML=d.rssi+'dB'
-	a.ts.innerHTML=t2hms(d.ts)
+	
+	a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()
 	if(d.lvl==0)
 	{
 	 a.LVL.style.visibility='hidden'
 	 a.level.style.visibility='hidden'
-	 a.lbl.style.visibility='hidden'
 	 for(i=0;i<item.length;i++)
 	  document.getElementById('L'+i).style.visibility='hidden'
 	 a.header.innerHTML='<small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; '
 	}
-//	if(+d.wh > 100000)
-//		a.wh.value=d.wh.toFixed(0)
-//	else if(+d.wh > 10000)
-//		a.wh.value=d.wh.toFixed(1)
-//	else
-		a.wh.value=d.wh
+	a.wh.value=d.wh
 	a.cost.value=((+d.wh)*(+a.ppkw.value/1000)).toFixed(3)
 	a.MOT.setAttribute('bgcolor',d.mo?'red':'')
 	if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')
@@ -76,6 +78,16 @@ on=(a.RLY.value=='OFF')
 setVar('on',on)
 a.RLY.value=on?'ON ':'OFF'
 a.RLY.setAttribute('style',on?'color:red':'')
+}
+
+function pf()
+{
+if(a.PF.value=='LAST') l=1
+else if(a.PF.value=='OFF ') l=2
+else l=0
+setVar('powerup',l)
+pus=['LAST','OFF ',' ON ']
+a.PF.value=pus[l]
 }
 
 function led1()
@@ -212,6 +224,8 @@ function fillData()
   a.mtime.value=t2hms(data.mot)
   a.auto.value=t2hms(data.auto)
   a.CH.value=data.ch?' ON ':'OFF'
+  pus=['LAST','OFF ',' ON ']
+  a.PF.value=pus[data.pu]
   a.CH.setAttribute('style',data.ch?'color:red':'')
   a.watts.value=data.watt
   a.ppkw.value=data.ppkw/1000
@@ -220,7 +234,6 @@ function fillData()
   idx=0
   for(d=0;d<dev.length;d++)
   	AddDev(dev[d])
-  AddDev(['',0,0,0,0])
 }
 
 function AddEntry(arr)
@@ -229,7 +242,7 @@ function AddEntry(arr)
   inp=document.createElement("input")
   inp.id='N'+idx
   inp.type='text'
-  inp.size=9
+  inp.size=8
   inp.value=arr[0]
   td.appendChild(inp)
 
@@ -260,7 +273,7 @@ function AddEntry(arr)
   inp.id='L'+idx
   inp.type='text'
   inp.value=arr[4]?arr[4]:''
-  inp.size=2
+  inp.size=1
   td.appendChild(inp)
 
   tr=document.createElement("tr")
@@ -280,12 +293,8 @@ function changeDev(dev)
  switch(idx[0])
  {
  	case 'DE':
-	  setVar('DEV',idx[1])
-	  setVar('NM','"'+val+'"')
- 	  break
-    case 'IP':
-	  setVar('DEV',idx[1])
-	  setVar('IP','"'+val+'"')
+ 	  s=document.getElementById('IP-'+idx[1]).innerHTML
+ 	  window.location.href='http://'+s
  	  break
  	case 'ON':
  	  mode=0
@@ -307,14 +316,6 @@ function changeDev(dev)
 	  setVar('DEV',idx[1])
 	  setVar('DLY',+val)
  	  break
- 	case 'DL':
-	  setVar('DEV',idx[1])
-	  setVar('DEL',0)
- 	  break
- 	case 'GO':
- 	  s=document.getElementById('IP-'+idx[1]).value
- 	  window.location.href='http://'+s
- 	  break
  }
 }
 
@@ -322,28 +323,21 @@ function changeDev(dev)
 function AddDev(arr)
 {
   td=document.createElement("td")
-  inp=document.createElement("input")
-  inp.id='GO-'+idx
-  inp.type='button'
-  inp.size=2
-  inp.value='GO'
-  inp.onclick=function(){changeDev(this); }
-  td.appendChild(inp)
+  td.align="center"
 
   inp=document.createElement("input")
   inp.id='DE-'+idx
-  inp.type='text'
-  inp.size=12
+  inp.type='button'
+  inp.style.width='100px'
   inp.value=arr[0]
-  inp.onchange=function(){changeDev(this); }
+  inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
 
-  inp=document.createElement("input")
+  inp=document.createElement("button")
   inp.id='IP-'+idx
+  inp.border=1
   inp.type='text'
-  inp.size=10
-  inp.value=arr[1]
-  inp.onchange=function(){changeDev(this); }
+  inp.innerHTML=arr[1]
   td.appendChild(inp)
 
   inp=document.createElement("input")
@@ -351,7 +345,6 @@ function AddDev(arr)
   inp.type='button'
   nams=['------','LNK','REV']
   inp.value=nams[arr[2]]
-  inp.size=3
   inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
 
@@ -379,13 +372,6 @@ function AddDev(arr)
   inp.onchange=function(){changeDev(this); }
   td.appendChild(inp)
 
-  inp=document.createElement("input")
-  inp.id='DL-'+idx
-  inp.type='button'
-  inp.value='X'
-  inp.onclick=function(){changeDev(this); }
-  td.appendChild(inp)
-
   tr=document.createElement("tr")
   tr.id='dv'+idx
   tr.appendChild(td)
@@ -407,22 +393,21 @@ fillData()
 <tr><td>Light</td><td>LED1 &nbsp LED2</td><td><input id="nm" type=text size=8 onchange="changeNm();"></td><td><div id="time"></div></td></tr>
 <tr><td><input name="RLY" value="OFF" type='button' onclick="{manual()}"></td>
 <td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
-<td colspan=2><label for="CH">Rpt<input name="CH" value="OFF" type='button' onclick="{togCall()}"> <label for="auto"> Auto Off </label><input name="auto" type="text" value="0" size="4"> &nbsp <label for="TZ">TZ </label><input name="TZ" type=text size=1 value='-5'></td></tr>
+<td colspan=2><label for="CH">Rpt</label><input name="CH" value="OFF" type='button' onclick="{togCall()}"> <label for="auto"> Auto Off </label><input name="auto" type="text" value="0" size="4"> &nbsp <label for="TZ">TZ </label><input name="TZ" type=text size=1 value='-5'></td></tr>
 <tr>
-<td colspan=4><label for="LVL" id="lbl">Level </label><input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min=1 max=100 onchange="slide();">  &nbsp
- &nbsp <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
+<td colspan=4>Start <input name="PF" value="LAST" type='button' onclick="{pf()}"> &nbsp;<input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min=1 max=200 onchange="slide();">
+&nbsp; <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
 
 <tr><td>Name &nbsp </td><td colspan=3><div id="header"><small>En Su Mo Tu We Th Fr Sa On Off</small> Time Duration Level</div></td></tr>
 </table>
 <table align="right" style="font-size:small" id="list"></table>
-<table width="450" align="right" style="font-size:small" id="dev"></table>
+<table width="450" align="right" style="font-size:small" id="dev"><tr><td align="center"> &#8195; &#8195; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &nbsp; &nbsp; &nbsp; Mode Dim Mt Delay</td></tr></table>
 <table align="right" width="450">
-<tr><td></td><td>PPKWH<input name="ppkw" type=text size=3> &nbsp Watts
- <input name=watts type=text size=1> </td><td>WH<input id="wh" name="wh" type=button size=8 onclick="clearWh();"> $<input id="cost" name="cost" type=button size=8 onclick="clearWh();">
+<tr><td>PPKWH</td><td align="left"><input name="ppkw" type=text size=3> &nbsp;<label for="watts"> Watts</label><input name=watts type=text size=1> </td><td>WH<input id="wh" name="wh" type=button size=8 onclick="clearWh();"> $<input id="cost" name="cost" type=button size=8 onclick="clearWh();">
 </td></tr>
-<tr><td><div id="rssi">0db</div></td><td> </td><td><div id="ts">1:00:00</div></td></tr>
-<tr><td id="MOT">Motion</td><td><input name="mtime" type=text size=4 style="width: 60px"> &nbsp
- <input value='Save Changes' type=button onclick="setData();"> &nbsp </td><td> <input id="myKey" name="key" type=text size=50 placeholder="password" style="width: 128px">
+<tr><td><div id="rssi">0db</div></td><td colspan=2><div id="ts">1:00:00</div></td></tr>
+<tr><td id="MOT">Motion</td><td><input name="mtime" type=text size=4 style="width: 60px">
+ <input value='Save' type=button onclick="setData();"> <input value='Restart' type=button onclick="setVar('reset',0);"> </td><td> <input id="myKey" name="key" type=text size=50 placeholder="password" style="width: 128px">
 <input type="button" value="Set" onClick="{localStorage.setItem('key', key = document.all.myKey.value)}"></td></tr>
 </table>
 </body>
