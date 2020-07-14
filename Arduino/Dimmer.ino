@@ -21,7 +21,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// Arduino IDE 1.9.0, esp8266 SDK 2.6.3
+// Arduino IDE 1.9.0, esp8266 SDK 2.7.1
 
 #define OTA_ENABLE //uncomment to enable Arduino IDE Over The Air update code
 
@@ -60,6 +60,8 @@ bool    bOverride;    // automatic override of schedule
 uint8_t nWsConnected;
 bool    bEnMot = true;
 bool    bOldOn;
+uint32_t nDaySec = 0;
+uint32_t nDayWh = 0;
 
 WiFiManager wifi;  // AP page:  192.168.4.1
 AsyncWebServer server( serverPort );
@@ -81,13 +83,16 @@ enum reportReason
   Reason_Test,
 };
 
-void totalUpWatts()
+void totalUpWatts(uint8_t nLevel)
 {
   if(onCounter == 0)
-    return; // level 0 = switch
-  float w = (float)ee.watts * cont.getPower() / 100;
+    return;
+  float w = (float)ee.watts * cont.getPower(nLevel) / 100;
   ee.fTotalWatts += (float)onCounter * w  / 3600; // add current cycle
   ee.nTotalSeconds += onCounter;
+// ee.days[day()-1].sec += onCounter;
+//  ee.days[day()-1].fwh += (float)nDaySec * w  / 3600;
+  nDaySec = 0;
   onCounter = 0;
 }
 
@@ -95,6 +100,7 @@ String dataJson()
 {
   jsonString js("state");
   js.Var("name", ee.szName);
+  js.Var("eesize", sizeof(ee));
   js.Var("t", now() - ( (ee.tz + utime.getDST() ) * 3600) );
   js.Var("on", cont.m_bLightOn);
   js.Var("l1", ee.bLED[0]);
@@ -103,7 +109,7 @@ String dataJson()
   js.Var("tr", nSecTimer);
   js.Var("sn", nSched);
   js.Var("rssi", WiFi.RSSI());
-  totalUpWatts();
+  totalUpWatts(cont.m_nLightLevel);
   js.Var("wh", ee.fTotalWatts );
   js.Var("ts", ee.nTotalSeconds);
   js.Var("st", ee.nTotalStart);
@@ -168,6 +174,7 @@ void parseParams(AsyncWebServerRequest *request)
     "port", // 10
     "motpin",
     "reset",
+    "clear",
     "",
   };
 
@@ -245,6 +252,10 @@ void parseParams(AsyncWebServerRequest *request)
         break;
       case 12: // reset
         ESP.reset();
+        break;
+      case 13: // clear device list
+        memset(&ee.dev, 0, sizeof(ee.dev));
+        eemem.update();
         break;
     }
   }
@@ -569,10 +580,6 @@ void checkQueue()
 
   if( jsonPush.begin(queue[i].ip.toString().c_str(), queue[i].sUri.c_str(), queue[i].port, false, false, NULL, NULL, 300) )
   {
-//    String s = "CQ ";
-//    s += queue[i].ip.toString();
-//    s += queue[i].sUri;
-//    ws.textAll(s);
     jsonPush.addList(jsonListPush);
     cqTime = millis();
     cnt = 30;
@@ -705,7 +712,7 @@ void setup()
   {
     char szName[38];
     MDNS.hostname(i).toCharArray(szName, sizeof(szName));
-    char *p = strtok(szName, ".");
+    strtok(szName, "."); // remove .local
 
     int d;
     for(d = 0; ee.dev[d].IP[0] && d < MAX_DEV; d++)
@@ -723,7 +730,7 @@ void setup()
     {
       memset(&ee.dev[d], 0, sizeof(Device));
       strcpy(ee.dev[d].szName, szName);
-      ee.dev[d].IP[0] = MDNS.IP(i)[0]; // update IP
+      ee.dev[d].IP[0] = MDNS.IP(i)[0]; // copy IP
       ee.dev[d].IP[1] = MDNS.IP(i)[1];
       ee.dev[d].IP[2] = MDNS.IP(i)[2];
       ee.dev[d].IP[3] = MDNS.IP(i)[3];
@@ -785,7 +792,7 @@ void setup()
       s += ","; s += ee.dev[i].delay;
       s += "]";
     }
-    
+
     s += "]\ndata=";
     jsonString js;
     js.Var("name", ee.szName);
@@ -798,6 +805,25 @@ void setup()
     js.Var("pu", ee.startMode);
     s += js.Close();
 
+/*    s += "\ndays=[";
+    for(int i = 0; i < 31; i++)
+    {
+      if(i) s += ",\n";
+      s += "[";  s += ee.days[i].sec;
+      s += ",";  s += ee.days[i].fwh;
+      s += "]";
+    }
+    s += "]";
+    s += "\nmonths=[";
+    for(int i = 0; i < 12; i++)
+    {
+      if(i) s += ",\n";
+      s += "[";  s += ee.months[i].sec;
+      s += ",";  s += ee.months[i].fwh;
+      s += "]";
+    }
+    s += "]";
+*/
     request->send(200, "text/json", s);
   });
   server.on ( "/wifi", HTTP_GET|HTTP_POST, [](AsyncWebServerRequest *request)
@@ -893,6 +919,7 @@ void loop()
   static uint32_t tm;
   if(cont.m_nLightLevel != nOldLevel && !Serial.available() && (millis() - tm > 400) ) // new level from MCU & no new serial data
   {
+    totalUpWatts(nOldLevel);
     sendState();
     CallHost(Reason_Level);
     tm = millis();
@@ -912,7 +939,7 @@ void loop()
     if(cont.m_bLightOn && ee.autoTimer)
       nSecTimer = ee.autoTimer;
     if(cont.m_bLightOn == false)
-      totalUpWatts();
+      totalUpWatts(cont.m_nLightLevel);
     checkDevs(DC_LNK);
   }
 
@@ -943,7 +970,11 @@ void loop()
       checkDevs(DC_MOT);
     }
   }
-
+//  if(cont.m_bFeature)
+//  {
+//    cont.m_bFeature = false;
+//    bEnMot = !bEnMot;
+//  }
   checkQueue();
   if(sec_save != second()) // only do stuff once per second
   {
@@ -965,6 +996,26 @@ void loop()
         {
           if(ee.ntpServer[0]) utime.start();
         }
+        if(hour_save == 0)
+        {
+          totalUpWatts(cont.m_nLightLevel);
+/*          if(day()-1 == 0)
+          {
+            float fTotal = 0;
+            uint32_t sTotal = 0;
+            for(int i = 0; i < 31; i++)
+            {
+              fTotal += ee.days[i].fwh;
+              sTotal += ee.days[i].sec;
+            }
+            ee.months[(month() + 10) % 12].fwh = fTotal;
+            ee.months[(month() + 10) % 12].sec = sTotal;
+            memset(&ee.days, 0, sizeof(ee.days) );
+          }
+          else
+            memset(&ee.days[day()-1], 0, sizeof(Energy) );
+            */
+        }
         eemem.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
       }
 
@@ -980,8 +1031,9 @@ void loop()
 
     if(cont.m_bLightOn)
     {
+      ++nDaySec;
       if(++onCounter > (60*60*12))
-        totalUpWatts();
+        totalUpWatts(cont.m_nLightLevel);
     }
 
     if(nWrongPass)            // wrong password blocker
