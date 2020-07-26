@@ -152,9 +152,29 @@ String dataEnergy()
   totalUpWatts(cont.m_nLightLevel);
   js.Var("wh", ee.fTotalWatts );
   js.Var("ts", ee.nTotalSeconds);
-  js.Var("v", cont.m_fVolts);
-  js.Var("c", cont.m_fCurrent);
-  js.Var("p", cont.m_fPower);
+  if(cont.m_fVolts)
+  {
+    js.Var("v", cont.m_fVolts);
+    js.Var("c", cont.m_fCurrent);
+    js.Var("p", cont.m_fPower);
+  }
+  else // fake it
+  {
+    float fw = (float)ee.watts * cont.getPower(cont.m_nLightLevel) / 100;
+    js.Var("v", 120);
+    js.Var("c", fw /120);
+    js.Var("p", fw);
+  }
+  return js.Close();
+}
+
+String hourJson(uint8_t hour_save)
+{
+  jsonString js("update");
+  js.Var("type", "hour");
+  js.Var("e", hour_save);
+  js.Var("sec", eHours[hour_save].sec);
+  js.Var("p", eHours[hour_save].fwh);
   return js.Close();
 }
 
@@ -265,6 +285,7 @@ void parseParams(AsyncWebServerRequest *request)
         else
           strcpy(ee.szName, "Dimmer");
         eemem.update();
+        delay(1000);
         ESP.reset();
         break;
       case 7: // autoTimer
@@ -295,6 +316,7 @@ void parseParams(AsyncWebServerRequest *request)
         break;
       case 12: // reset
         eemem.update();
+        delay(1000);
         ESP.reset();
         break;
       case 13: // clear device list
@@ -473,6 +495,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 13: // reset
           eemem.update();
+          delay(1000);
           ESP.reset();
           break;
         case 14: // ch
@@ -537,6 +560,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
             break;
           strncpy(ee.szName, psValue, sizeof(ee.szName));
           eemem.update();
+          delay(1000);
           ESP.reset();
           break;
         case 32: // motpin
@@ -1062,11 +1086,12 @@ void loop()
       uint8_t hr = hour();
       if (hour_save != hr)  // update our time daily (at 2AM for DST)
       {
+        totalUpWatts(cont.m_nLightLevel);
+        WsSend(hourJson(hour_save));
         if( (hour_save = hr) == 2)
         {
           if(ee.ntpServer[0]) utime.start();
         }
-        totalUpWatts(cont.m_nLightLevel);
         eHours[hour_save].sec = 0;
         eHours[hour_save].fwh = 0;
         eemem.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
@@ -1105,7 +1130,7 @@ void loop()
       }
     }
 
-    if(nWsConnected && cont.m_fVolts)
+    if(nWsConnected)
       ws.textAll( dataEnergy() );
 
     if(nSecTimer) // scedule/motion shut off timer
