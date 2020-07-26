@@ -1,4 +1,4 @@
-// Class for controlling most serial dimmers (MOES, Geeni, etc.)
+// Class for controlling capacitive touch (center LED bar) dimmer (MOES, Geeni)
 
 #include "control.h"
 #include <TimeLib.h>
@@ -7,13 +7,11 @@
 
 // Only uncomment one
 
-//#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
+#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
 //#define MOES  // https://www.newegg.com/moes-ds01-1/p/0R7-00MY-00013
 //#define MOES2 // v1.1 uses main serial and 104-1000 for level
-#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
+//#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
 //#define GLASS // Avatar maybe? https://www.sears.com/avatar-controls-smart-wifi-dimmer-switch-wall-light/p-A074841312
-
-//#define DEBUG // prints data from MCU
 
 #define BAUD 9600
 #define DIM_CMD 2 // 2 for Geeni, glass, wired
@@ -113,28 +111,9 @@ void swControl::listen()
         inBuffer[idx++] = c; // get length + checksum
         if(idx > len || idx >= sizeof(inBuffer) )
         {
-#ifdef DEBUG // send data to browser console.log
-          String s="print;";
-          s += String(v, HEX);
-          s += " ";
-          s += String(cmd, HEX);
-          s += " ";
-          s += String(len, HEX);
-#endif
           uint8_t chk = 0xFF + len + v + cmd;
           for(int a = 0; a < len; a++)
-          {
-#ifdef DEBUG
-            s += " ";
-            s += String(inBuffer[a], HEX);
-#endif
             chk += inBuffer[a];
-          }
-#ifdef DEBUG
-          s += " = ";
-          s += chk;
-          WsSend(s);
-#endif
           if( inBuffer[len] == chk) // good checksum
           {
             switch(cmd)
@@ -190,19 +169,13 @@ void swControl::listen()
   }
 }
 
-// 0 = req status (len=0)
-// 1 = req key (len=0)
-// 2 = req ? (len=0)
-// 6 = set dimmer (len:5=on/off or 8=level)
-// 8 = req full (len=0) returns both 7/5 and 7/8
-
 void swControl::setSwitch(bool bOn)
 {
   uint8_t data[5];// = {1,1,0,1,bOn};
   data[0] = 1;
   data[1] = 1; //  bool type
   data[2] = 0;
-  data[3] = 1;
+  data[3] = 1; // 1 byte value
   data[4] = bOn;
   writeSerial(6, data, 5);
 }
@@ -213,25 +186,39 @@ void swControl::setLevel()
   data[0] = DIM_CMD;
   data[1] = 2; // value type
   data[2] = 0;
-  data[3] = 4; // probably ramp
-  data[4] = 0;
-  data[5] = 0; // 16 bit value
+  data[3] = 4; // 4 byte value
   uint16_t lvl = map(m_nLightLevel, 1, USER_RANGE, nLevelMin, nLevelMax);
+  data[4] = 0;
+  data[5] = 0;
   data[6] = lvl >> 8;
   data[7] = lvl & 0xFF;
   writeSerial(6, data, 8);
 }
 
-bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint8_t len)
+void swControl::test(uint8_t cmd, uint16_t v)
 {
-  uint8_t buf[16] = {0};
+  uint8_t data[8];
+  data[0] = cmd;
+  data[1] = 2; // value type
+  data[2] = 0;
+  data[3] = 4; // 4 byte value
+  data[4] = 0;
+  data[5] = 0;
+  data[6] = v >> 8;
+  data[7] = v & 0xFF;
+  writeSerial(6, data, 8); 
+}
+
+bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint16_t len)
+{
+  uint8_t buf[16];
 
   buf[0] = 0x55;
   buf[1] = 0xAA;
   buf[2] = 0; // version
   buf[3] = cmd;
-  buf[4] = 0; // 16 bit len big endien
-  buf[5] = len;
+  buf[4] = len >> 8; // 16 bit len big endien
+  buf[5] = len & 0xFF;
 
   int i;
   if(p) for(i = 0; i < len; i++)
