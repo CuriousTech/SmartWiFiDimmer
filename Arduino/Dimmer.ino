@@ -62,6 +62,7 @@ bool    bEnMot = true;
 bool    bOldOn;
 uint32_t nDaySec = 0;
 uint32_t nDayWh = 0;
+Energy eHours[24];
 
 WiFiManager wifi;  // AP page:  192.168.4.1
 AsyncWebServer server( serverPort );
@@ -87,11 +88,33 @@ void totalUpWatts(uint8_t nLevel)
 {
   if(onCounter == 0)
     return;
-  float w = (float)ee.watts * cont.getPower(nLevel) / 100;
+  float w;
+  if(cont.m_fPower) // real power monitor
+    w = cont.m_fPower;
+  else
+    w = (float)ee.watts * cont.getPower(nLevel) / 100;
   ee.fTotalWatts += (float)onCounter * w  / 3600; // add current cycle
   ee.nTotalSeconds += onCounter;
-// ee.days[day()-1].sec += onCounter;
-//  ee.days[day()-1].fwh += (float)nDaySec * w  / 3600;
+  uint8_t hr = hour();
+  eHours[hr].sec += nDaySec;
+  eHours[hr].fwh += (float)nDaySec * w  / 3600;
+  if(year() > 2019) // Ensure date is valid
+  {
+    ee.days[day()-1].sec = 0; // total the day from current hours
+    ee.days[day()-1].fwh = 0;
+    for(int i = 0; i <= hr; i++)
+    {
+      ee.days[day()-1].sec += eHours[i].sec;
+      ee.days[day()-1].fwh += eHours[i].fwh;
+    }
+    ee.months[month()-1].sec = 0; // refresh the month with new values
+    ee.months[month()-1].fwh = 0;
+    for(int i = 0; i < day(); i++)
+    {
+      ee.months[month()-1].sec += ee.days[i].sec;
+      ee.months[month()-1].fwh += ee.days[i].fwh;
+    }
+  }
   nDaySec = 0;
   onCounter = 0;
 }
@@ -100,11 +123,10 @@ String dataJson()
 {
   jsonString js("state");
   js.Var("name", ee.szName);
-  js.Var("eesize", sizeof(ee));
   js.Var("t", now() - ( (ee.tz + utime.getDST() ) * 3600) );
   js.Var("on", cont.m_bLightOn);
-  js.Var("l1", ee.bLED[0]);
-  js.Var("l2", ee.bLED[1]);
+  js.Var("l1", ee.flags1.led1);
+  js.Var("l2", ee.flags1.led2);
   js.Var("lvl", cont.m_nLightLevel);
   js.Var("tr", nSecTimer);
   js.Var("sn", nSched);
@@ -113,8 +135,26 @@ String dataJson()
   js.Var("wh", ee.fTotalWatts );
   js.Var("ts", ee.nTotalSeconds);
   js.Var("st", ee.nTotalStart);
+  js.Var("v", cont.m_fVolts);
+  js.Var("c", cont.m_fCurrent);
+  js.Var("p", cont.m_fPower);
   if(ee.motionPin)
     js.Var("mo", digitalRead(ee.motionPin));
+  return js.Close();
+}
+
+String dataEnergy()
+{
+  jsonString js("energy");
+  js.Var("t", now() - ( (ee.tz + utime.getDST() ) * 3600) );
+  js.Var("rssi", WiFi.RSSI());
+  js.Var("tr", nSecTimer);
+  totalUpWatts(cont.m_nLightLevel);
+  js.Var("wh", ee.fTotalWatts );
+  js.Var("ts", ee.nTotalSeconds);
+  js.Var("v", cont.m_fVolts);
+  js.Var("c", cont.m_fCurrent);
+  js.Var("p", cont.m_fPower);
   return js.Close();
 }
 
@@ -125,6 +165,7 @@ void parseParams(AsyncWebServerRequest *request)
 
   char temp[100];
   char password[64] = "";
+  static uint8_t cmd;
 
   // get password first
   for ( uint8_t i = 0; i < request->params(); i++ ) {
@@ -175,6 +216,8 @@ void parseParams(AsyncWebServerRequest *request)
     "motpin",
     "reset",
     "clear",
+    "cmd",
+    "val",
     "",
   };
 
@@ -210,7 +253,7 @@ void parseParams(AsyncWebServerRequest *request)
           nSecTimer = ee.autoTimer;
         break;
       case 4: // callHost enable
-        ee.bCall = bValue;
+        ee.flags1.call = bValue;
         break;
       case 5: // delay off
         if(cont.m_bLightOn)
@@ -251,11 +294,18 @@ void parseParams(AsyncWebServerRequest *request)
         ee.motionPin = s.toInt();
         break;
       case 12: // reset
+        eemem.update();
         ESP.reset();
         break;
       case 13: // clear device list
         memset(&ee.dev, 0, sizeof(ee.dev));
         eemem.update();
+        break;
+      case 14:
+        cmd = s.toInt();
+        break;
+      case 15:
+//        cont.test(cmd, s.toInt());
         break;
     }
   }
@@ -397,11 +447,11 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 6: // led1
           cont.setLED(0, iValue ? true:false);
-          ee.bLED[0] = iValue;
+          ee.flags1.led1 = iValue;
           break;
         case 7: // led2
           cont.setLED(1, iValue ? true:false);
-          ee.bLED[1] = iValue;
+          ee.flags1.led2 = iValue;
           break;
         case 8: // lvl
           cont.setLevel(iValue);
@@ -422,10 +472,11 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           ee.nMotionSecs = iValue;
           break;
         case 13: // reset
+          eemem.update();
           ESP.reset();
           break;
         case 14: // ch
-          ee.bCall = iValue ? true:false;
+          ee.flags1.call = iValue;
           if(iValue) CallHost(Reason_Setup); // test
           break;
         case 15: // PPWH
@@ -435,6 +486,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           ee.watts = iValue;
           break;
         case 17: // rt
+          totalUpWatts(cont.m_nLightLevel);
           ee.fTotalWatts = 0;
           ee.nTotalSeconds = 0;
           ee.nTotalStart = now() - ( (ee.tz + utime.getDST() ) * 3600);
@@ -464,24 +516,14 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
         case 25: // NM name of device (no more renaming)
 //          strncpy(ee.dev[dev].szName, psValue, sizeof(ee.dev[dev].szName) );
           break;
-        case 26: // IP of devie
-/*          {
-            IPAddress ip;
-            if (ip.fromString(psValue))
-            {
-              ee.dev[dev].IP[0] = ip[0];
-              ee.dev[dev].IP[1] = ip[1];
-              ee.dev[dev].IP[2] = ip[2];
-              ee.dev[dev].IP[3] = ip[3];
-            }
-          }*/
+        case 26: // IP of device
           break;
         case 27: // MODE disable, link, reverse
           ee.dev[dev].mode = iValue;
           break;
         case 28: // DIM // link dimming
           ee.dev[dev].flags &= ~1; // define this later
-          ee.dev[dev].flags |= iValue;
+          ee.dev[dev].flags |= (iValue & 1);
           break;
         case 29: // MOT (flag 2) // motion to other switch
           ee.dev[dev].flags &= ~2; // define this later
@@ -501,7 +543,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           ee.motionPin = iValue;
           break;
         case 33: // startmode
-          ee.startMode = iValue;
+          ee.flags1.start = iValue;
           break;
         default:
           break;
@@ -535,7 +577,9 @@ void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
       switch(iName)
       {
         case 0: // time
-          setTime(iValue + ( (ee.tz + utime.getDST() ) * 3600));
+          setTime(iValue + (ee.tz * 3600));
+          utime.DST();
+          setTime(iValue + ((ee.tz + utime.getDST()) * 3600));
           break;
         case 1: // ppkw
           ee.ppkw = iValue;
@@ -604,7 +648,7 @@ void callQueue(IPAddress ip, String sUri, uint16_t port)
 
 void CallHost(reportReason r)
 {
-  if(ee.hostIP[0] == 0 || ee.bCall == false) // no host set
+  if(ee.hostIP[0] == 0 || ee.flags1.call == 0) // no host set
     return;
 
   String sUri = String("/wifi?name=\"");
@@ -653,19 +697,36 @@ void checkDevs(int dt)
     {
       if(ee.dev[i].mode == DM_LNK) // turn other on and off
       {
-        sUri += "on=";
-        sUri += cont.m_bLightOn;
+        if(ee.dev[i].delay) // on/delayed off link
+        {
+          if(cont.m_bLightOn)
+          {
+            sUri += "on=";
+            sUri += cont.m_bLightOn;
+          }
+          else
+          {
+            sUri += "dly=";
+            sUri += ee.dev[i].delay;
+          }
+        }
+        else // on/off link
+        {
+          sUri += "on=";
+          sUri += cont.m_bLightOn;
+        }
       }
       else if(ee.dev[i].mode == DM_REV) // turn other off if on
       {
-        if(ee.dev[i].delay) // delayed off
+        if(cont.m_bLightOn)
         {
-          sUri += "dly=";
-          sUri += ee.dev[i].delay;
-        }
-        else if(cont.m_bLightOn) // instant off
-        {
-          sUri += "on=0";
+          if(ee.dev[i].delay) // delayed off
+          {
+            sUri += "dly=";
+            sUri += ee.dev[i].delay;
+          }
+          else // instant off
+            sUri += "on=0";
         }
       }
       callQueue(ip, sUri, 80);
@@ -703,7 +764,7 @@ void setup()
     if(!MDNS.begin( ee.szName ) );
 //      Serial.println("Error setting up mDNS");
     MDNS.addService("esp", "tcp", serverPort);
-    cont.setLED(0, ee.bLED[0] ? true:false);
+    cont.setLED(0, ee.flags1.led1 ? true:false);
   }
 
   String s;
@@ -798,14 +859,26 @@ void setup()
     js.Var("name", ee.szName);
     js.Var("tz", ee.tz);
     js.Var("mot", ee.nMotionSecs);
-    js.Var("ch", ee.bCall);
+    js.Var("ch", ee.flags1.call);
     js.Var("auto", ee.autoTimer);
     js.Var("ppkw", ee.ppkw);
-    js.Var("watt", ee.watts);
-    js.Var("pu", ee.startMode);
+    if(cont.m_fPower)
+      js.Var("watt", cont.m_fPower);
+    else
+      js.Var("watt", ee.watts);
+    js.Var("pu", ee.flags1.start);
     s += js.Close();
 
-/*    s += "\ndays=[";
+    s += "\nhours=[";
+    for(int i = 0; i < 24; i++)
+    {
+      if(i) s += ",\n";
+      s += "[";  s += eHours[i].sec;
+      s += ",";  s += eHours[i].fwh;
+      s += "]";
+    }
+    s += "]";
+    s += "\ndays=[";
     for(int i = 0; i < 31; i++)
     {
       if(i) s += ",\n";
@@ -823,7 +896,7 @@ void setup()
       s += "]";
     }
     s += "]";
-*/
+
     request->send(200, "text/json", s);
   });
   server.on ( "/wifi", HTTP_GET|HTTP_POST, [](AsyncWebServerRequest *request)
@@ -878,24 +951,24 @@ void setup()
   if(wifi.isCfg() == false && ee.ntpServer[0])
     utime.start();
   cont.setLevel(ee.nLightLevel);
-  switch(ee.startMode)
+  switch(ee.flags1.start)
   {
-    case 0: cont.setSwitch(ee.bLightOn); break; // last saved
+    case 0: cont.setSwitch(ee.flags1.lightOn); break; // last saved
     case 1: cont.setSwitch(false); break; // start off
     case 2: cont.setSwitch(true); break; // start on
   }
-  changeLEDs(ee.bLightOn);
+  changeLEDs(ee.flags1.lightOn);
 }
 
 void changeLEDs(bool bOn)
 {
-  if(ee.bLED[0] == 2)
+  if(ee.flags1.led1 == 2)
     cont.setLED(0, bOn); // link
-  else if(ee.bLED[0] == 3)
+  else if(ee.flags1.led1 == 3)
     cont.setLED(0, bOn ? false:true); // reverse
-  if(ee.bLED[1] == 2)
+  if(ee.flags1.led2 == 2)
     cont.setLED(1, bOn); // link
-  else if(ee.bLED[1] == 3)
+  else if(ee.flags1.led2 == 3)
     cont.setLED(1, bOn ? false:true); // reverse
 }
 
@@ -970,11 +1043,7 @@ void loop()
       checkDevs(DC_MOT);
     }
   }
-//  if(cont.m_bFeature)
-//  {
-//    cont.m_bFeature = false;
-//    bEnMot = !bEnMot;
-//  }
+
   checkQueue();
   if(sec_save != second()) // only do stuff once per second
   {
@@ -990,32 +1059,16 @@ void loop()
     {
       min_save = minute();
       checkSched(false);        // check every minute for next schedule
-      if (hour_save != hour())  // update our time daily (at 2AM for DST)
+      uint8_t hr = hour();
+      if (hour_save != hr)  // update our time daily (at 2AM for DST)
       {
-        if( (hour_save = hour()) == 2)
+        if( (hour_save = hr) == 2)
         {
           if(ee.ntpServer[0]) utime.start();
         }
-        if(hour_save == 0)
-        {
-          totalUpWatts(cont.m_nLightLevel);
-/*          if(day()-1 == 0)
-          {
-            float fTotal = 0;
-            uint32_t sTotal = 0;
-            for(int i = 0; i < 31; i++)
-            {
-              fTotal += ee.days[i].fwh;
-              sTotal += ee.days[i].sec;
-            }
-            ee.months[(month() + 10) % 12].fwh = fTotal;
-            ee.months[(month() + 10) % 12].sec = sTotal;
-            memset(&ee.days, 0, sizeof(ee.days) );
-          }
-          else
-            memset(&ee.days[day()-1], 0, sizeof(Energy) );
-            */
-        }
+        totalUpWatts(cont.m_nLightLevel);
+        eHours[hour_save].sec = 0;
+        eHours[hour_save].fwh = 0;
         eemem.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
       }
 
@@ -1026,7 +1079,7 @@ void loop()
         CallHost(Reason_Setup);
       }
       ee.nLightLevel = cont.m_nLightLevel; // update EEPROM with last settings
-      ee.bLightOn = cont.m_bLightOn;
+      ee.flags1.lightOn = cont.m_bLightOn;
     }
 
     if(cont.m_bLightOn)
@@ -1051,6 +1104,9 @@ void loop()
           nSecTimer = ee.autoTimer;
       }
     }
+
+    if(nWsConnected && cont.m_fVolts)
+      ws.textAll( dataEnergy() );
 
     if(nSecTimer) // scedule/motion shut off timer
     {
