@@ -25,6 +25,7 @@ body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:rig
 <script type="text/javascript">
 a=document.all
 idx=0
+breal=false
 nms=['OFF','ON ','LNK','REV']
 dys=[['Sun'],['Mon'],['Tue'],['Wed'],['Thu'],['Fri'],['Sat']]
 maxW=0
@@ -39,8 +40,8 @@ console.log(evt.data)
  lines=evt.data.split(';')
  event=lines[0]
  data=lines[1]
+ d=JSON.parse(data)
  if(event=='state'){
-	d=JSON.parse(data)
 	d2=new Date(d.t*1000)
 	a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
 	a.RLY.value=nms[d.on]
@@ -52,7 +53,7 @@ console.log(evt.data)
 	a.LVL.value=d.lvl
 	a.level.value=d.lvl
 	rs=d.rssi+'dB '
-	if(d.v) rs += '&nbsp;&nbsp;'+d.v+'V'
+	if(d.v){rs+='&nbsp;&nbsp;'+d.v+'V';breal=true}
 	a.rssi.innerHTML=rs
 	if(d.c) a.v.innerHTML='&nbsp;&nbsp;'+d.c+'A'
   	if(d.p) a.watts.value=d.p
@@ -73,15 +74,25 @@ console.log(evt.data)
  }
  else if(event=='energy')
  {
-	d=JSON.parse(data)
 	d2=new Date(d.t*1000)
 	a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
 	rs=d.rssi+'dB &nbsp;&nbsp;'+d.v+'V'
 	a.rssi.innerHTML=rs
 	a.v.innerHTML='&nbsp;&nbsp;'+d.c+'A'
-  	a.watts.value=d.p
+  	if(breal) a.watts.value=d.p
 	a.wh.value=d.wh.toFixed(2)
 	draw_point(d.p)
+ }
+ else if(event=='update')
+ {
+ 	switch(d.type)
+ 	{
+ 	  case 0:
+		hours[d.e][0]=d.sec
+		hours[d.e][1]=d.p
+		break
+	}
+	update_bars()
  }
  else if(event=='alert'){alert(data)}
 // draw_chart()
@@ -415,8 +426,8 @@ try {
 	var c=document.getElementById('chart')
 	ctx=c.getContext("2d")
 	ctx.fillStyle="#225"
-	ht=(c.height/4)-5
-	ctx.fillRect(0,0,c.width,ht)
+	ht=(c.height/4)-8
+	ctx.fillRect(0,0,c.width,ht+2)
 
     date = new Date()
 	if(wt>maxW) maxW=wt
@@ -438,7 +449,7 @@ try {
 	mvd=0
 	for(i=0;i<3600;i++)
 	{
-		if(wArr[i])
+		if(wArr[i]!='undefined')
 		{
 			x=i*c.width/3600
 		    y=wArr[i]*ht/maxW
@@ -450,6 +461,28 @@ try {
 	ctx.stroke()
 }catch(err){console.log(err)}
 }
+
+function update_bars()
+{
+	var c=document.getElementById('chart')
+	ctx=c.getContext("2d")
+	ctx.fillStyle="#336"
+	ht=(c.height-10)/4
+	ctx.fillRect(0,ht,c.width,c.height)
+	ctx.fillStyle="#FFF"
+	ctx.font="10px sans-serif"
+	ctx.textAlign="center"
+
+    dots=[]
+    date = new Date()
+	ctx.lineWidth=10
+	draw_scale(hours,c.width,ht,ht+3,0,date.getHours())
+	ctx.lineWidth=7
+	draw_scale(days,c.width,ht,ht*2+3,1,date.getDate()-1)
+	ctx.lineWidth=15
+	draw_scale(months,c.width,ht,ht*3+3,1,date.getMonth())
+}
+
 $(document).ready(function(){
 try {
 	key=localStorage.getItem('key')
@@ -469,11 +502,11 @@ try {
 
 	ctx=c.getContext("2d")
 	ctx.fillStyle="#336"
-	ctx.fillRect(0,0,c.width,c.height)
+	ht=(c.height-10)/4
+	ctx.fillRect(0,ht,c.width,c.height)
 	ctx.fillStyle="#FFF"
 	ctx.font="10px sans-serif"
 	ctx.textAlign="center"
-	ht=(c.height-10)/4
 
     dots=[]
     date = new Date()
@@ -546,7 +579,7 @@ function draw_scale(arr,w,h,o,p,hi)
 		if(i==hi)
 		{
 			lw=ctx.lineWidth
-		ctx.strokeStyle="#000"
+			ctx.strokeStyle="#000"
 			ctx.lineWidth=1
 			ctx.beginPath()
 		    ctx.moveTo(x+lw+1,o+h-20)
