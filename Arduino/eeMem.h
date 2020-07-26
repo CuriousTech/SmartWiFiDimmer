@@ -26,8 +26,8 @@ struct Sched          // User set schedule item
   char    sname[20];  // entry name
 }; // 28 bytes aligned
 
-#define MAX_SCHED 50
-#define MAX_DEV 20
+#define MAX_SCHED 30
+#define MAX_DEV 30
 
 enum DEV_FLAGS{
   DF_DIM = 1,
@@ -49,38 +49,51 @@ struct Device
   uint8_t flags; // DEV_FLAGS
 }; // 40
 
+struct Energy
+{
+  float fwh;     // WH used
+  uint32_t sec;  // seconds on
+}; // 8
+
+struct flags_t
+{
+  uint16_t call:1;
+  uint16_t lightOn:1;
+  uint16_t start:2;
+  uint16_t led1:2;
+  uint16_t led2:2;
+  uint16_t res:8;
+};
+
 struct eeSet // EEPROM backed data
 {
-  uint16_t size;          // if size changes, use defauls
+  uint16_t size;          // if size changes, use defaults
   uint16_t sum;           // if sum is diiferent from memory struct, write
   char     szSSID[32];
   char     szSSIDPassword[64];
   char     ntpServer[32]; // ntp server URL
   uint16_t udpPort;       // udp port
-  int8_t   tz;            // Timezone offset
-  int8_t   res1;
+  int8_t   tz;
+  flags_t  flags1;
   char     szControlPassword[32];
   uint8_t  hostIP[4];
   uint16_t hostPort;
   char     szName[28];
   uint32_t autoTimer;
   uint16_t nMotionSecs;
-  bool     bCall;        // use callHost
-  int8_t   startMode;
-  uint8_t  bLED[2]; // 212
   uint16_t watts;
   uint16_t ppkw;
-  uint8_t  bLightOn;
   uint8_t  nLightLevel;
   float    fTotalWatts;
   uint32_t nTotalSeconds;
   uint32_t nTotalStart;
-  uint32_t res32;
-  Sched    schedule[MAX_SCHED];  // 50*28
-  struct Device dev[MAX_DEV];
   uint8_t motionPin;
   uint8_t res;
-}; // 1612 + (40*MAX_DEV)
+  Sched    schedule[MAX_SCHED];  // 50*28
+  Device   dev[MAX_DEV];
+  Energy days[31]; // 248 the esp-07 EEPROM seems to be smaller than ESP-12?
+  Energy months[12]; // 96
+}; // 2272 + Energy = 2653
 
 extern eeSet ee;
 
