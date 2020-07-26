@@ -14,13 +14,17 @@ public:
   void setSwitch(bool bOn);
   void setLevel(void);
   void setLevel(uint8_t level);
+  void test(uint8_t cmd, uint16_t v);
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
   bool    m_bLightOn;      // state
   bool    m_bLED[2];
   uint8_t m_nLightLevel = USER_RANGE / 2; // current level
+  float   m_fVolts;
+  float   m_fCurrent;
+  float   m_fPower;
 private:
-  bool writeSerial(uint8_t cmd, uint8_t *p = NULL, uint8_t len = 0);
+  bool writeSerial(uint8_t cmd, uint8_t *p = NULL, uint16_t len = 0);
   void checkStatus(void);
 
   uint8_t m_nNewLightLevel = USER_RANGE / 2; // set in a callback
