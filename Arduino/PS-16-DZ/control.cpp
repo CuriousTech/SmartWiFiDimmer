@@ -19,9 +19,9 @@ void swControl::init()
   Serial.begin(19200);
 }
 
-uint8_t swControl::getPower()
+uint8_t swControl::getPower(uint8_t nLevel)
 {
-  return map(m_nLightLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
+  return map(nLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
 }
 
 void swControl::listen()
