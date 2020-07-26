@@ -16,9 +16,9 @@ void swControl::init()
   Serial.begin(9600);
 }
 
-uint8_t swControl::getPower()
+uint8_t swControl::getPower(uint8_t nLevel)
 {
-  return map(m_nLightLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
+  return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
 void swControl::listen()
@@ -37,14 +37,14 @@ void swControl::listen()
       {
         if(m_bLightOn == false)
           m_bLightOn = true;
-        if(m_nLightLevel < 200)
+        if(m_nLightLevel < m_nUserRange)
             nDirection = 1; // up
         else
             nDirection = 2; // down
       }
       if(nDirection == 1)
       {
-        if(m_nLightLevel < 200)
+        if(m_nLightLevel < m_nUserRange)
           m_nLightLevel++;
       }
       else
@@ -67,7 +67,7 @@ void swControl::listen()
   if(s != ls) // Set new light value every second
   {
     ls = s;
-    uint8_t data = map(m_nLightLevel, 1, 200, nLevelMin, nLevelMax);
+    uint8_t data = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
     writeSerial( m_bLightOn ? data : 0);
   }
  
@@ -92,9 +92,23 @@ bool swControl::writeSerial(uint8_t level)
   return Serial.write(buf, 6);
 }
 
+void swControl::test(uint8_t cmd, uint16_t v)
+{
+  uint8_t buf[6];
+
+  buf[0] = 0xFF;
+  buf[1] = 0x55;
+  buf[2] = cmd;
+  buf[3] = v>>8;
+  buf[4] = v&0xFF;
+  buf[5] = 0x0A;
+
+  Serial.write(buf, 6);
+}
+
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, 1, 200);
+  m_nNewLightLevel = constrain(n, 1, m_nUserRange);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
