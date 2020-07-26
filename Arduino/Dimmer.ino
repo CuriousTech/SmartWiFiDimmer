@@ -160,9 +160,9 @@ String dataEnergy()
   }
   else // fake it
   {
-    float fw = (float)ee.watts * cont.getPower(cont.m_nLightLevel) / 100;
+    float fw = (cont.m_bLightOn) ? ((float)ee.watts * cont.getPower(cont.m_nLightLevel) / 100) : 0;
     js.Var("v", 120);
-    js.Var("c", fw /120);
+    js.Var("c", fw / 120);
     js.Var("p", fw);
   }
   return js.Close();
@@ -175,6 +175,16 @@ String hourJson(uint8_t hour_save)
   js.Var("e", hour_save);
   js.Var("sec", eHours[hour_save].sec);
   js.Var("p", eHours[hour_save].fwh);
+  return js.Close();
+}
+
+String dayJson(uint8_t day)
+{
+  jsonString js("update");
+  js.Var("type", "day");
+  js.Var("e", day);
+  js.Var("sec", ee.days[day].sec);
+  js.Var("p", ee.days[day].fwh);
   return js.Close();
 }
 
@@ -998,7 +1008,7 @@ void changeLEDs(bool bOn)
 
 void loop()
 {
-  static uint8_t hour_save, min_save, sec_save;
+  static uint8_t hour_save, min_save, sec_save, last_day = 32;
   static bool bBtnState;
   static uint32_t btn_time;
   static bool bMotion;
@@ -1082,12 +1092,15 @@ void loop()
     if(min_save != minute())    // only do stuff once per minute
     {
       min_save = minute();
+      WsSend(hourJson(hour_save));
       checkSched(false);        // check every minute for next schedule
       uint8_t hr = hour();
       if (hour_save != hr)  // update our time daily (at 2AM for DST)
       {
-        totalUpWatts(cont.m_nLightLevel);
-        WsSend(hourJson(hour_save));
+//        WsSend(hourJson(hour_save));
+        if(hour_save==0 && last_day != 32)
+          WsSend(dayJson(last_day));
+        last_day = day()-1;
         if( (hour_save = hr) == 2)
         {
           if(ee.ntpServer[0]) utime.start();
