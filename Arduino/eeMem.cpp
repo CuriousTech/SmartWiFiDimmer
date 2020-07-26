@@ -3,26 +3,23 @@
 
 eeSet ee = {              // Defaults for blank EEPROM
   sizeof(eeSet),
-  0xAAAA,
+  0xAAAA, // checksum
   "",  // saved SSID
   "", // router password
-  "", 2390, -5, // NTP server, udp port, TZ
-  0, // res1
-  "esp8266ct", // device password for control
+  "0.us.pool.ntp.org", 2390, -5, // NTP server, udp port, TZ
+  {0}, // flags1
+  "password", // device password for control
   {192,168,0,100}, 80, // host IP and port
-  "Garage",
+  "DiningRoom",
   0, // autoTimer
   0, // motionSecs
-  true, // report
-  0, // startMode
-  {0, 0}, // LED1
-  75, // watts for device
-  143, // 15 cents per KWH
-  false,
+  23, // watts for device
+  143, // 14 cents per KWH
   100, // level
   0, // total watts used
   0, // total seconds
   0, // total start time
+  0, // motionPin  Basement=12, LivingRoom=16 RCW-0516, Back switch=14
   0,
   {
     {  6*60,  10*60, 254, 100, "Morning"},  // time, seconds, wday, level, name
@@ -30,9 +27,9 @@ eeSet ee = {              // Defaults for blank EEPROM
     { 14*60, 120*60, 254, 20, "Something"},
   },
   {0}, // devices
-  0, // motionPin  Basement=12, LivingRoom=16 RCW-0516, Back switch=14
-  0
-}; // 24xx
+  {0}, // Energy mon for days
+  {0} // Energy months
+}; // 2616
 
 eeMem::eeMem()
 {
