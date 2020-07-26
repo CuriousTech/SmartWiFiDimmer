@@ -3,25 +3,36 @@
 
 #include <Arduino.h>
 
+#define S31
+
+#ifdef S31
+#define TOUCH_IN  0  // side button
+#define WIFI_LED  13  // green LED
+#else // most basic switches
 #define WIFI_LED   4  // top red LED (on low)
 #define TOUCH_LED  5  // Circle LED (low = on)
-#define RELAY     12  // Relay (high = on)
 #define TOUCH_IN  13  // Touch switch input (low = press)
+#endif
+
+#define RELAY     12  // Relay (high = on)
 
 class swControl
 {
 public:
   swControl();
-  void listen(void);
+  bool listen(void);
   void init(void);
   void setSwitch(bool bOn);
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
-  uint8_t getPower(void);
+  uint8_t getPower(uint8_t nLevel);
 
-  bool    m_bLightOn;      // state
-  bool    m_bLED[2];
+  bool   m_bLightOn;      // state
+  bool   m_bLED[2];
   int8_t m_nLightLevel = 0; // current level
+  float  m_fVolts;
+  float  m_fCurrent;
+  float  m_fPower;
   const uint8_t nLevelMin = 0;
   const uint8_t nLevelMax = 0; // no dimmer
   const uint8_t nWattMin = 100; // switch
