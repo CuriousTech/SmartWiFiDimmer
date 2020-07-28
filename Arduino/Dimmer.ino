@@ -53,7 +53,7 @@ int nWrongPass;       // wrong password block counter
 eeMem eemem;
 UdpTime utime;
 uint16_t nSecTimer; // off timer
-uint16_t onCounter; // usage timer
+uint32_t onCounter; // usage timer
 uint16_t nDelayOn;  // delay on timer
 uint8_t nSched;     // current schedule
 bool    bOverride;    // automatic override of schedule
@@ -295,7 +295,6 @@ void parseParams(AsyncWebServerRequest *request)
         else
           strcpy(ee.szName, "Dimmer");
         eemem.update();
-        delay(1000);
         ESP.reset();
         break;
       case 7: // autoTimer
@@ -326,7 +325,6 @@ void parseParams(AsyncWebServerRequest *request)
         break;
       case 12: // reset
         eemem.update();
-        delay(1000);
         ESP.reset();
         break;
       case 13: // clear device list
@@ -505,7 +503,6 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 13: // reset
           eemem.update();
-          delay(1000);
           ESP.reset();
           break;
         case 14: // ch
@@ -570,7 +567,6 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
             break;
           strncpy(ee.szName, psValue, sizeof(ee.szName));
           eemem.update();
-          delay(1000);
           ESP.reset();
           break;
         case 32: // motpin
@@ -903,6 +899,7 @@ void setup()
     js.Var("pu", ee.flags1.start);
     s += js.Close();
 
+    totalUpWatts(cont.m_nLightLevel);
     s += "\nhours=[";
     for(int i = 0; i < 24; i++)
     {
@@ -1092,6 +1089,7 @@ void loop()
     if(min_save != minute())    // only do stuff once per minute
     {
       min_save = minute();
+      totalUpWatts(cont.m_nLightLevel);
       WsSend(hourJson(hour_save));
       checkSched(false);        // check every minute for next schedule
       uint8_t hr = hour();
