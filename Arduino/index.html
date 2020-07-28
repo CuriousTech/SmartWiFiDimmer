@@ -32,7 +32,7 @@ maxW=0
 wArr=[]
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.103/ws")
+//ws=new WebSocket("ws://192.168.31.111/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -366,7 +366,7 @@ function AddDev(arr)
   inp=document.createElement("input")
   inp.id='DE-'+idx
   inp.type='button'
-  inp.style.width='100px'
+  inp.style.width='105px'
   inp.value=arr[0]
   inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
@@ -374,6 +374,7 @@ function AddDev(arr)
   inp=document.createElement("button")
   inp.id='IP-'+idx
   inp.border=1
+  inp.style.width='105px'
   inp.type='text'
   inp.innerHTML=arr[1]
   td.appendChild(inp)
@@ -473,7 +474,6 @@ function update_bars()
 	ht=c.height/4
 	ctx.fillStyle="#FFF"
 	ctx.font="10px sans-serif"
-	ctx.textAlign="center"
 
     dots=[]
     date = new Date()
@@ -506,7 +506,6 @@ try {
 	ht=c.height/4
 	ctx.fillStyle="#FFF"
 	ctx.font="10px sans-serif"
-	ctx.textAlign="center"
 
     dots=[]
     date = new Date()
@@ -567,6 +566,9 @@ function draw_scale(arr,w,h,o,p,hi)
 	max=0
 	for(i=0;i<arr.length;i++)
 		if(arr[i][1]>max) max=arr[i][1]
+	ctx.textAlign="right"
+	ctx.fillText(max,w-1,o+10)
+	ctx.textAlign="center"
 	for(i=0;i<arr.length;i++)
 	{
 		x=i*(w/arr.length)+8
