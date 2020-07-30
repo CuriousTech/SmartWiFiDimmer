@@ -130,14 +130,9 @@ String dataJson()
   js.Var("lvl", cont.m_nLightLevel);
   js.Var("tr", nSecTimer);
   js.Var("sn", nSched);
-  js.Var("rssi", WiFi.RSSI());
   totalUpWatts(cont.m_nLightLevel);
-  js.Var("wh", ee.fTotalWatts );
   js.Var("ts", ee.nTotalSeconds);
   js.Var("st", ee.nTotalStart);
-  js.Var("v", cont.m_fVolts);
-  js.Var("c", cont.m_fCurrent);
-  js.Var("p", cont.m_fPower);
   if(ee.motionPin)
     js.Var("mo", digitalRead(ee.motionPin));
   return js.Close();
@@ -151,7 +146,6 @@ String dataEnergy()
   js.Var("tr", nSecTimer);
   totalUpWatts(cont.m_nLightLevel);
   js.Var("wh", ee.fTotalWatts );
-  js.Var("ts", ee.nTotalSeconds);
   if(cont.m_fVolts)
   {
     js.Var("v", cont.m_fVolts);
@@ -161,7 +155,7 @@ String dataEnergy()
   else // fake it
   {
     float fw = (cont.m_bLightOn) ? ((float)ee.watts * cont.getPower(cont.m_nLightLevel) / 100) : 0;
-    js.Var("v", 120);
+    js.Var("v", 0);
     js.Var("c", fw / 120);
     js.Var("p", fw);
   }
@@ -190,15 +184,21 @@ String dayJson(uint8_t day)
 
 void parseParams(AsyncWebServerRequest *request)
 {
+  IPAddress ip = request->client()->remoteIP();
+
   if(request->params() == 0)
+  {
+    lastIP = ip;
     return;
+  }
 
   char temp[100];
   char password[64] = "";
   static uint8_t cmd;
 
   // get password first
-  for ( uint8_t i = 0; i < request->params(); i++ ) {
+  for( uint8_t i = 0; i < request->params(); i++)
+  {
     AsyncWebParameter* p = request->getParam(i);
 
     p->value().toCharArray(temp, 100);
@@ -211,8 +211,6 @@ void parseParams(AsyncWebServerRequest *request)
     }
   }
 
-  IPAddress ip = request->client()->remoteIP();
-
   if(strcmp(ee.szControlPassword, password) || nWrongPass)
   {
     if(nWrongPass == 0) // it takes at least 10 seconds to recognize a wrong password
@@ -222,7 +220,7 @@ void parseParams(AsyncWebServerRequest *request)
     if(ip != lastIP)  // if different IP drop it down
        nWrongPass = 10;
     jsonString js("hack");
-    js.Var("ip", request->client()->remoteIP().toString() );
+    js.Var("ip", ip.toString() );
     js.Var("pass", password);
     ws.textAll(js.Close());
     lastIP = ip;
@@ -312,6 +310,7 @@ void parseParams(AsyncWebServerRequest *request)
         ee.hostIP[1] = ip[1];
         ee.hostIP[2] = ip[2];
         ee.hostIP[3] = ip[3];
+        ee.flags1.call = 1;
         CallHost(Reason_Setup); // test
         break;
      case 9: // ntp
@@ -435,12 +434,12 @@ const char *jsonListCmd[] = { "cmd",
   "name",
   "motpin",
   "powerup",
+  "hostip",
   NULL
 };
 
 void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
 {
-  char *p, *p2;
   static int n;
   static int idx;
   static int dev;
@@ -574,6 +573,14 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 33: // startmode
           ee.flags1.start = iValue;
+          break;
+        case 34: // hostip
+          ee.hostPort = 80;
+          ee.hostIP[0] = lastIP[0];
+          ee.hostIP[1] = lastIP[1];
+          ee.hostIP[2] = lastIP[2];
+          ee.hostIP[3] = lastIP[3];
+          ee.flags1.call = 1;
           break;
         default:
           break;
