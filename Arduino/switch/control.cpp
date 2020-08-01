@@ -2,10 +2,7 @@
 
 #include "control.h"
 #include <TimeLib.h>
-//#include <UdpTime.h>
 #include "eeMem.h"
-
-//extern UdpTime utime;
 
 swControl::swControl()
 {
@@ -88,17 +85,14 @@ bool swControl::listen()
 
             if(m_bLightOn)
             {
-              if(Adj & 0x40)
-                m_fVolts = (float)dwVoltCoef / (float)dwVoltCycle;
-              if(Adj & 0x10)
-                m_fPower = (float)dwPowerCoef / (float)dwPowerCycle;
-              if(Adj & 0x20)
-                m_fCurrent = (float)dwCurrentCoef / (float)dwCurrentCycle;
+              m_fVolts = (Adj & 0x40) ? ( (float)dwVoltCoef / (float)dwVoltCycle) : 0;
+              m_fPower = (Adj & 0x10) ? ( (float)dwPowerCoef / (float)dwPowerCycle) : 0;
+              m_fCurrent = (m_fPower && (Adj & 0x20)) ? ((float)dwCurrentCoef / (float)dwCurrentCycle) : 0;
             }
             else // output off
             {
-                m_fPower = 0;
-                m_fCurrent = 0;
+              m_fPower = 0;
+              m_fCurrent = 0;
             }
             bRet = true;
           }
