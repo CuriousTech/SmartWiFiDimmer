@@ -30,7 +30,7 @@ public:
   bool   m_bLightOn;      // state
   bool   m_bLED[2];
   int8_t m_nLightLevel = 0; // current level
-  float  m_fVolts;
+  float  m_fVolts = 120;
   float  m_fCurrent;
   float  m_fPower;
   const uint8_t nLevelMin = 0;
