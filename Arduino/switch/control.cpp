@@ -48,6 +48,8 @@ bool swControl::listen()
   static uint8_t inBuffer[24];
   static uint8_t idx;
   static uint8_t state;
+  static uint8_t nCnt;
+  static uint16_t lastCF;
 
   while(Serial.available())
   {
@@ -85,9 +87,27 @@ bool swControl::listen()
 
             if(m_bLightOn)
             {
-              m_fVolts = (Adj & 0x40) ? ( (float)dwVoltCoef / (float)dwVoltCycle) : 0;
-              m_fPower = (Adj & 0x10) ? ( (float)dwPowerCoef / (float)dwPowerCycle) : 0;
-              m_fCurrent = (m_fPower && (Adj & 0x20)) ? ((float)dwCurrentCoef / (float)dwCurrentCycle) : 0;
+              if(wCF != lastCF)
+              {
+                lastCF = wCF; // just grab 1 of 10 Todo: average
+                if(Adj & 0x40)
+                  m_fVolts =  (float)dwVoltCoef / (float)dwVoltCycle;
+                if(Adj & 0x20)
+                {
+                  m_fCurrent = (float)dwCurrentCoef / (float)dwCurrentCycle;
+                  m_fPower =  (float)dwPowerCoef / (float)dwPowerCycle;
+                }
+                nCnt = 10;
+              }
+              else
+              {
+                if(--nCnt == 0)
+                {
+                  nCnt = 10;
+                  m_fPower = 0;
+                  m_fCurrent = 0;
+                }
+              }
             }
             else // output off
             {
