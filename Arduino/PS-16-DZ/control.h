@@ -3,35 +3,32 @@
 
 #include <Arduino.h>
 
-#define USER_RANGE 200
+#define WIFI_LED  13  // top green LED (on low)
 
 class swControl
 {
 public:
   swControl();
   void listen(void);
-  void init(void);
+  void init(uint8_t nUserRange);
   void setSwitch(bool bOn);
   void setLevel(void);
   void setLevel(uint8_t level);
-  void test(uint8_t cmd, uint16_t v);
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
+
   bool    m_bLightOn;      // state
   bool    m_bLED[2];
-  uint8_t m_nLightLevel = USER_RANGE / 2; // current level
+  uint8_t m_nLightLevel = 50; // current level
+  const uint8_t nLevelMin = 10;
+  const uint8_t nLevelMax = 99;
+  const uint8_t nWattMin = 60; // 60% of full watts at lowest
   float   m_fVolts;
   float   m_fCurrent;
   float   m_fPower;
 private:
-  bool writeSerial(uint8_t cmd, uint8_t *p = NULL, uint16_t len = 0);
-  void checkStatus(void);
-
-  uint8_t m_nNewLightLevel = USER_RANGE / 2; // set in a callback
-  uint8_t m_cs = 1;
-  uint16_t nLevelMin = 25; // hardware range
-  uint16_t nLevelMax = 255;
-  const uint8_t nWattMin = 60; // 60% of full watts at lowest
+  uint8_t m_nUserRange;
+  uint8_t m_nNewLightLevel = 100; // set in a callback
 };
 
 #endif // CONTROL_H
