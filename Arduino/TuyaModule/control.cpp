@@ -11,8 +11,9 @@ swControl::swControl()
   pinMode(SWITCH_IN, INPUT);
 }
 
-void swControl::init()
+void swControl::init(uint8_t nUserRange)
 {
+  m_nUserRange = nUserRange;
   Serial.begin(9600);
 }
 
