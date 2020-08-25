@@ -21,21 +21,23 @@ class swControl
 public:
   swControl();
   bool listen(void);
-  void init(void);
+  void init(uint8_t nUserRange);
   void setSwitch(bool bOn);
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
 
-  bool   m_bLightOn;      // state
+  bool   m_bLightOn;      // power state
   bool   m_bLED[2];
-  int8_t m_nLightLevel = 0; // current level
-  float  m_fVolts = 120;
+  int8_t m_nLightLevel = 0; // current level (0=switch)
+  float  m_fVolts = 0; // 0 = no monitor
   float  m_fCurrent;
   float  m_fPower;
+  float  m_fCurrentArr[10];
+  float  m_fPowerArr[10];
   const uint8_t nLevelMin = 0;
   const uint8_t nLevelMax = 0; // no dimmer
-  const uint8_t nWattMin = 100; // switch
+  const uint8_t nWattMin = 100; // switch 100%
 };
 
 #endif // CONTROL_H
