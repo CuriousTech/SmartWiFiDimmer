@@ -456,6 +456,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 1: // on
           nSecTimer = 0;
+          if(iValue == 2) iValue = cont.m_bLightOn^1;
           bOldOn = !iValue; // force report
           cont.setSwitch(iValue);
           if(nSched) bOverride = !iValue;
@@ -714,11 +715,9 @@ void CallHost(reportReason r)
   callQueue(ip, sUri, ee.hostPort);
 }
 
-enum dev_mng_type{
-  DC_LNK,
-  DC_DIM,
-  DC_MOT,
-};
+#define DC_LNK 1
+#define DC_DIM 2
+#define DC_MOT 4
 
 void checkDevs(int dt)
 {
@@ -730,7 +729,7 @@ void checkDevs(int dt)
     String sUri = String("/?key=");
     sUri += ee.szControlPassword; // assumes all paswords are the same
     sUri += "&";
-    if(dt == DC_LNK && ee.dev[i].mode)
+    if((dt & DC_LNK) && ee.dev[i].mode)
     {
       if(ee.dev[i].mode == DM_LNK) // turn other on and off
       {
@@ -768,13 +767,13 @@ void checkDevs(int dt)
       }
       callQueue(ip, sUri, 80);
     }
-    if(dt == DC_DIM && (ee.dev[i].flags & DF_DIM) ) // link dimmer level
+    if((dt & DC_DIM) && (ee.dev[i].flags & DF_DIM) ) // link dimmer level
     {
       sUri += "level=";
       sUri += cont.m_nLightLevel;
       callQueue(ip, sUri, 80);
     }
-    if(dt == DC_MOT && (ee.dev[i].flags & DF_MOT) ) // test for motion turns on other light
+    if((dt & DC_MOT) && (ee.dev[i].flags & DF_MOT) ) // test for motion turns on other light
     {
       sUri += "on=1";
       callQueue(ip, sUri, 80);
@@ -793,7 +792,7 @@ void sendState()
 
 void setup()
 {
-  cont.init();
+  cont.init(200);
   WiFi.hostname(ee.szName);
   wifi.autoConnect(ee.szName, ee.szControlPassword); // Tries config AP, then starts softAP mode for config
   if(wifi.isCfg() == false)
@@ -1078,7 +1077,7 @@ void loop()
         sendState();
       else
         CallHost(Reason_Motion);
-      checkDevs(DC_MOT);
+      checkDevs(DC_MOT | DC_LNK);
     }
   }
 
@@ -1093,16 +1092,17 @@ void loop()
       cont.setLED(0, !cont.m_bLED[0] ); // blink for config
     }
 
+    if(sec_save == 59)
+      totalUpWatts(cont.m_nLightLevel);
+
     if(min_save != minute())    // only do stuff once per minute
     {
       min_save = minute();
-      totalUpWatts(cont.m_nLightLevel);
       WsSend(hourJson(hour_save));
       checkSched(false);        // check every minute for next schedule
       uint8_t hr = hour();
       if (hour_save != hr)  // update our time daily (at 2AM for DST)
       {
-//        WsSend(hourJson(hour_save));
         if(hour_save==0 && last_day != 32)
           WsSend(dayJson(last_day));
         last_day = day()-1;
@@ -1194,7 +1194,6 @@ bool checkSched(bool bCheck) // Checks full schedule at the beginning of every m
             cont.setLevel(ee.schedule[i].level);
           else
             cont.setSwitch(true);
-          sendState();
         }
         return true;
     }
