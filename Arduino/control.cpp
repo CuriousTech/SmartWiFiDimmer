@@ -7,9 +7,9 @@
 
 // Only uncomment one
 
-#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
+//#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
 //#define MOES  // https://www.newegg.com/moes-ds01-1/p/0R7-00MY-00013
-//#define MOES2 // v1.1 uses main serial and 104-1000 for level
+#define MOES2 // v1.1 uses main serial and 104-1000 for level
 //#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
 //#define GLASS // Avatar maybe? https://www.sears.com/avatar-controls-smart-wifi-dimmer-switch-wall-light/p-A074841312
 
@@ -26,6 +26,8 @@
 #define WIFI_LED  14  // Green LED (on high) for the wired one
 #endif
 
+extern void WsSend(String s);
+
 swControl::swControl()
 {
 #ifdef MOES2 // 16 bit level on new version
@@ -37,8 +39,10 @@ swControl::swControl()
 #endif
 }
 
-void swControl::init()
+void swControl::init(uint8_t nRange)
 {
+ m_nUserRange = nRange;
+ m_nLightLevel = m_nNewLightLevel = m_nUserRange / 2; // set in a callback
 #ifdef WIFI_LED
   digitalWrite(WIFI_LED, LOW);
   pinMode(WIFI_LED, OUTPUT);
@@ -58,10 +62,8 @@ void swControl::checkStatus()
 
 uint8_t swControl::getPower(uint8_t nLevel)
 {
-  return map(nLevel, 0, USER_RANGE, nWattMin, 100);  // 1% = about 60% power
+  return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
-
-extern void WsSend(String s);
 
 void swControl::listen()
 {
@@ -137,8 +139,9 @@ void swControl::listen()
                     break;
                   case 8: // 03 02 00 04 00 ?? lvlH lvlL
                     lvl = (inBuffer[6] << 8) | inBuffer[7];
+                    if(lvl < nLevelMin) lvl = nLevelMin;
                     m_nNewLightLevel = m_nLightLevel =
-                      map(lvl, nLevelMin, nLevelMax, 1, USER_RANGE);
+                      map(lvl, nLevelMin, nLevelMax, 1, m_nUserRange);
                     break;
                   default:
                     break;
@@ -187,7 +190,7 @@ void swControl::setLevel()
   data[1] = 2; // value type
   data[2] = 0;
   data[3] = 4; // 4 byte value
-  uint16_t lvl = map(m_nLightLevel, 1, USER_RANGE, nLevelMin, nLevelMax);
+  uint16_t lvl = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
   data[4] = 0;
   data[5] = 0;
   data[6] = lvl >> 8;
@@ -233,7 +236,7 @@ bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint16_t len)
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, 1, USER_RANGE);
+  m_nNewLightLevel = constrain(n, 1, m_nUserRange);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
