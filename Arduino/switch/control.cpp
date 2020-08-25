@@ -4,11 +4,13 @@
 #include <TimeLib.h>
 #include "eeMem.h"
 
+extern void WsSend(String s);
+
 swControl::swControl()
 {
 }
 
-void swControl::init()
+void swControl::init(uint8_t nUserRange)
 {
   digitalWrite(WIFI_LED, HIGH);
   pinMode(WIFI_LED, OUTPUT);
@@ -45,15 +47,21 @@ bool swControl::listen()
   }
 
 #ifdef S31
+  if(m_fVolts == 0) // set a default before valid packets
+    m_fVolts = 120;
+
   static uint8_t inBuffer[24];
   static uint8_t idx;
   static uint8_t state;
   static uint8_t nCnt;
+  static uint8_t nArr;
   static uint16_t lastCF;
+  static uint32_t timeout;
 
   while(Serial.available())
   {
     uint8_t c = Serial.read();
+
     switch(state)
     {
       case 0:
@@ -67,9 +75,11 @@ bool swControl::listen()
           state = 0;
         break;
       case 2:
-        inBuffer[idx++] = c; // get length + checksum
+        inBuffer[idx++] = c; // get data + checksum
         if(idx > 21 || idx >= sizeof(inBuffer) )
         {
+          timeout = millis();
+
           uint8_t chk = 0;
           int i;
           for(i = 0; i < 21; i++)
@@ -85,42 +95,53 @@ bool swControl::listen()
             uint8_t Adj = inBuffer[18];
             uint16_t wCF = inBuffer[19] << 8 | inBuffer[20];
 
-            if(m_bLightOn)
+            if(Adj & 0x40)
+               m_fVolts =  (float)dwVoltCoef / (float)dwVoltCycle;
+
+            static uint8_t nIdx;
+
+            if(wCF != lastCF) // Usually every 10 (10Hz), but not always
             {
-              if(wCF != lastCF)
-              {
-                lastCF = wCF; // just grab 1 of 10 Todo: average
-                if(Adj & 0x40)
-                  m_fVolts =  (float)dwVoltCoef / (float)dwVoltCycle;
-                if(Adj & 0x20)
-                {
-                  m_fCurrent = (float)dwCurrentCoef / (float)dwCurrentCycle;
-                  m_fPower =  (float)dwPowerCoef / (float)dwPowerCycle;
-                }
-                nCnt = 10;
-              }
-              else
-              {
-                if(--nCnt == 0)
-                {
-                  nCnt = 10;
-                  m_fPower = 0;
-                  m_fCurrent = 0;
-                }
-              }
+              lastCF = wCF;
+              nIdx = 0;
+              nCnt = 0;
             }
-            else // output off
+
+            if( Adj & 0x20 )
             {
-              m_fPower = 0;
-              m_fCurrent = 0;
+              if(nIdx < 10)
+              {
+                m_fCurrentArr[nIdx] = (float)dwCurrentCoef / (float)dwCurrentCycle;
+                m_fPowerArr[nIdx] =  (float)dwPowerCoef / (float)dwPowerCycle;
+              }
+
+              float fCurr, fPow;
+
+              if(nArr < 10) nArr++; // valid entries in array
+              for(int i = 0; i < nArr; i++) // average
+              {
+                fCurr += m_fCurrentArr[i];
+                fPow += m_fPowerArr[i];
+              }
+              m_fCurrent = fCurr / nArr;
+              m_fPower = fPow / nArr;
+              if(++nIdx >= 10)// wrap at 10 samples even if no new CF
+                nIdx = 0;
             }
-            bRet = true;
           }
+          bRet = true;
           state = 0;
           idx = 0;
         }
         break;
     }
+  }
+  if((!m_bLightOn) || (millis() - timeout) > 120) // Off or no serial data/invalid header (not 555A)
+  {
+    m_fPower = 0;
+    m_fCurrent = 0;
+    nArr = 0;
+    bRet = false;
   }
 #endif
   return bRet;
