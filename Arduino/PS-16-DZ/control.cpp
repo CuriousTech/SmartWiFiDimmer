@@ -12,8 +12,9 @@ swControl::swControl()
 {
 }
 
-void swControl::init()
+void swControl::init(uint8_t nRange)
 {
+  m_nUserRange = nRange;
   digitalWrite(WIFI_LED, HIGH);
   pinMode(WIFI_LED, OUTPUT);
   Serial.begin(19200);
@@ -21,7 +22,7 @@ void swControl::init()
 
 uint8_t swControl::getPower(uint8_t nLevel)
 {
-  return map(nLevel, 0, 200, nWattMin, 100);  // 1% = about 60% power
+  return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
 void swControl::listen()
@@ -45,7 +46,7 @@ void swControl::listen()
       }
       if((p = strstr(inBuffer, "bright")) != NULL) // "bright":99
       {
-        m_nNewLightLevel = map(atoi(p + 8), nLevelMin, nLevelMax, 0, 200); // 10-99
+        m_nNewLightLevel = map(atoi(p + 8), nLevelMin, nLevelMax, 0, m_nUserRange); // 10-99
         m_nLightLevel = m_nNewLightLevel;
       }
       String s;
@@ -91,7 +92,7 @@ void swControl::setLevel()
 
 void swControl::setLevel(uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, 0, 200);
+  m_nNewLightLevel = constrain(n, 0, m_nUserRange);
 }
 
 void swControl::setLED(uint8_t no, bool bOn)
