@@ -87,8 +87,7 @@ struct eeSet // EEPROM backed data
   float    fTotalWatts;
   uint32_t nTotalSeconds;
   uint32_t nTotalStart;
-  uint8_t motionPin;
-  uint8_t res;
+  uint8_t motionPin[2];
   Sched    schedule[MAX_SCHED];  // 50*28
   Device   dev[MAX_DEV];
   Energy days[31]; // 248 the esp-07 EEPROM seems to be smaller than ESP-12?
@@ -100,7 +99,8 @@ extern eeSet ee;
 class eeMem
 {
 public:
-  eeMem();
+  eeMem(){};
+  void init(void);
   void update(void);
 private:
   uint16_t Fletcher16( uint8_t* data, int count);
