@@ -24,6 +24,15 @@ void swControl::init(uint8_t nUserRange)
 #endif
 }
 
+char *swControl::getDevice()
+{
+#ifdef S31
+  return "S31";
+#else
+  return "SWITCH";
+#endif
+}
+
 uint8_t swControl::getPower(uint8_t nLevel)
 {
   return 100;  // no reduction
@@ -31,20 +40,68 @@ uint8_t swControl::getPower(uint8_t nLevel)
 
 bool swControl::listen()
 {
-  static bool bBtnState = true;
+  static bool bNewState;
+  static bool lbState;
+  static bool bState;
+  static long debounce;
+  static long lRepeatMillis;
+  static bool bRepeat;
+  static uint8_t nRepCnt;
+
+#define REPEAT_DELAY 300 // increase for slower repeat
+
   bool bRet = false;
-  bool bBtn = digitalRead(TOUCH_IN);
-  if(bBtn != bBtnState)
+
+  bNewState = digitalRead(TOUCH_IN);
+  if(bNewState != lbState)
+    debounce = millis(); // reset on state change
+
+  bool bInvoke = false;
+  if((millis() - debounce) > 30)
   {
-    bBtnState = bBtn;
-    if(bBtn) // release
+    if(bNewState != bState) // press or release
     {
+      bState = bNewState;
+      if (bState == LOW) // pressed
+      {
+        lRepeatMillis = millis(); // initial increment (doubled)
+      }
+      else // release
+      {
+        if(nRepCnt)
+        {
+          if(nRepCnt > 1)
+            m_bOption = true;
+        }
+        else
+        {
+          bInvoke = true;
+          bRepeat = false;
+        }
+      }
     }
-    else // press
+    else if(bState == LOW) // holding down
     {
-      setSwitch( !digitalRead(RELAY) ); // toggle
+      if( (millis() - lRepeatMillis) > REPEAT_DELAY * (bRepeat?1:2) )
+      {
+        lRepeatMillis = millis();
+        nRepCnt++;
+        bRepeat = true;
+#ifdef TOUCH_LED
+        bool bLed = digitalRead(TOUCH_LED);
+        digitalWrite(TOUCH_LED, !bLed);
+        delay(20);
+        digitalWrite(TOUCH_LED, bLed);
+#endif
+      }
     }
   }
+
+  if(bInvoke)
+  {
+    setSwitch( !digitalRead(RELAY) ); // toggle      
+  }
+  lbState = bNewState;
 
 #ifdef S31
   if(m_fVolts == 0) // set a default before valid packets
@@ -144,6 +201,17 @@ bool swControl::listen()
     bRet = false;
   }
 #endif
+
+  if(m_nBlink)
+  {
+    static uint32_t mil;
+    if(millis() - mil > m_nBlink * 16)
+    {
+      mil = millis();
+      setLED(0, !m_bLED[0]);
+    }
+  }
+
   return bRet;
 }
 
