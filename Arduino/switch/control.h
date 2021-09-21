@@ -3,7 +3,8 @@
 
 #include <Arduino.h>
 
-#define S31
+// Uncomment for S31 current sensor model
+//#define S31
 
 #ifdef S31
 #define TOUCH_IN  0  // side button
@@ -24,6 +25,7 @@ public:
   void init(uint8_t nUserRange);
   void setSwitch(bool bOn);
   void setLevel(uint8_t level);
+  char *getDevice(void);
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
 
@@ -35,6 +37,8 @@ public:
   float  m_fPower;
   float  m_fCurrentArr[10];
   float  m_fPowerArr[10];
+  bool  m_bOption;
+  uint8_t m_nBlink;
   const uint8_t nLevelMin = 0;
   const uint8_t nLevelMax = 0; // no dimmer
   const uint8_t nWattMin = 100; // switch 100%
