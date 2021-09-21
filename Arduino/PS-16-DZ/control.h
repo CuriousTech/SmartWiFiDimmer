@@ -8,9 +8,10 @@
 class swControl
 {
 public:
-  swControl();
+  swControl(){};
   void listen(void);
   void init(uint8_t nUserRange);
+  char *getDevice(void);
   void setSwitch(bool bOn);
   void setLevel(void);
   void setLevel(uint8_t level);
@@ -26,6 +27,8 @@ public:
   float   m_fVolts;
   float   m_fCurrent;
   float   m_fPower;
+  uint16_t m_nBlink;
+  bool  m_bOption;
 private:
   uint8_t m_nUserRange;
   uint8_t m_nNewLightLevel = 100; // set in a callback
