@@ -9,6 +9,7 @@ public:
   swControl();
   void listen(void);
   void init(uint8_t nUserRange);
+  char *getDevice(void);
   void setSwitch(bool bOn);
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
@@ -20,6 +21,8 @@ public:
   float   m_fVolts;
   float   m_fCurrent;
   float   m_fPower;
+  uint8_t m_nBlink;
+  bool    m_bOption;
   const uint8_t nLevelMin = 4;
   const uint8_t nLevelMax = 255;
   const uint8_t nWattMin = 60; // 60% of full watts at lowest
