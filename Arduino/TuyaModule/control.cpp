@@ -17,6 +17,11 @@ void swControl::init(uint8_t nUserRange)
   Serial.begin(9600);
 }
 
+char *swControl::getDevice()
+{
+  return "INLINE_CUBE";
+}
+
 uint8_t swControl::getPower(uint8_t nLevel)
 {
   return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
@@ -71,8 +76,7 @@ void swControl::listen()
     uint8_t data = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
     writeSerial( m_bLightOn ? data : 0);
   }
- 
- }
+}
 
 void swControl::setSwitch(bool bOn)
 {
