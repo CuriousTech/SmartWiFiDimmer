@@ -12,62 +12,70 @@
 #include "WiFiManager.h"
 #include "eeMem.h"
 
-WiFiManager::WiFiManager()
+void WiFiManager::autoConnect(char const *apName, const char *pPass)
 {
-}
+  _apName = apName;
+  _pPass = pPass;
 
-void WiFiManager::autoConnect(char const *apName, const char *pPass) {
-    _apName = apName;
-    _pPass = pPass;
-
-//  DEBUG_PRINT("");
-//    DEBUG_PRINT("AutoConnect");
-    
+  WiFi.hostname(ee.szName);
   if ( ee.szSSID[0] ) {
     DEBUG_PRINT("Waiting for Wifi to connect");
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ee.szSSID, ee.szSSIDPassword);
-    if ( hasConnected() )
-    {
-      _bCfg = false;
-      return;
-    }
+//    WiFi.setHostname(apName);
+    _state = ws_connecting;
+    _timer = 50;
   }
+  else
+  {
+    startAP();
+  }
+}
+
+void WiFiManager::setLEDFunc(void (*pfSetLed)(uint8_t no, bool bOn) )
+{
+  pSetLED = pfSetLed;
+}
+
+// Start AP mode
+void WiFiManager::startAP()
+{
   //setup AP
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(apName);
+  WiFi.softAP(_apName);
   DEBUG_PRINT("Started Soft Access Point");
-  IPAddress apIp = WiFi.softAPIP();
 
   DEBUG_PRINT(WiFi.softAPIP());
-  DEBUG_PRINT("Don't forget the port #");
 
-  if (!MDNS.begin(apName))
+  if (!MDNS.begin(_apName))
     DEBUG_PRINT("Error setting up MDNS responder!");
   WiFi.scanNetworks();
 
-  _timeout = true;
-  _bCfg = true;
+  _state = ws_config;
 }
 
-boolean WiFiManager::hasConnected(void)
+// return current connection sate
+int WiFiManager::state()
 {
-  for(int c = 0; c < 50; c++)
-  {
-    if (WiFi.status() == WL_CONNECTED)
-      return true;
-    delay(200);
-//    Serial.print(".");
-  }
-  DEBUG_PRINT("");
-  DEBUG_PRINT("Could not connect to WiFi");
-  return false;
+  return _state;
 }
 
+// returns true if in config/AP mode
 bool WiFiManager::isCfg(void)
 {
-  return _bCfg;
+  return (_state == ws_config);
+}
+
+// returns true once after a connection is made (for time)
+bool WiFiManager::connectNew()
+{
+  if(_state == ws_connectSuccess)
+  {
+    _state = ws_connected;
+    return true;
+  }
+  return false; 
 }
 
 void WiFiManager::setPass(const char *p){
@@ -77,11 +85,49 @@ void WiFiManager::setPass(const char *p){
   autoConnect(_apName, _pPass);
 }
 
-void WiFiManager::seconds(void) {
+// Called at any frequency
+void WiFiManager::service()
+{
   static int s = 1; // do first list soon
+  static uint32_t m;
+  static uint16_t ticks;
+  static bool bBlink;
 
-  if(_timeout == false)
+  if((millis() - m) > 200)
+  {
+    m = millis();
+    ticks++;
+    if(_state == ws_connecting)
+    {
+#ifdef DEBUG
+      Serial.print(".");
+#endif
+      if(pSetLED) pSetLED(0, bBlink = !bBlink);
+      if(_timer)
+      {
+        if (WiFi.status() == WL_CONNECTED)
+        {
+          DEBUG_PRINT("Connected");
+          _state = ws_connectSuccess;
+        }
+        else if(--_timer == 0)
+        {
+          DEBUG_PRINT("");
+          DEBUG_PRINT("Could not connect to WiFi");
+          startAP();
+        }
+      }
+      return;
+    }
+  }
+
+  if(ticks < 5)
     return;
+  ticks = 0;
+
+  if(_state != ws_config)
+    return;
+  if(pSetLED) pSetLED(0, bBlink = !bBlink);
   if(--s)
     return;
   s = 60;
@@ -120,43 +166,42 @@ String WiFiManager::page()
   form.replace("$key", _pPass );
   s += form;
   s += HTTP_END;
-  
-  _timeout = false;
+
   return s;
 }
 
 String WiFiManager::urldecode(const char *src)
 {
-    String decoded = "";
-    char a, b;
-    while (*src) {
-        if ((*src == '%') &&
-            ((a = src[1]) && (b = src[2])) &&
-            (isxdigit(a) && isxdigit(b))) {
-            if (a >= 'a')
-                a -= 'a'-'A';
-            if (a >= 'A')
-                a -= ('A' - 10);
-            else
-                a -= '0';
-            if (b >= 'a')
-                b -= 'a'-'A';
-            if (b >= 'A')
-                b -= ('A' - 10);
-            else
-                b -= '0';
-            
-            decoded += char(16*a+b);
-            src+=3;
-        } else if (*src == '+') {
-            decoded += ' ';
-            *src++;
-        } else {
-            decoded += *src;
-            *src++;
-        }
+  String decoded = "";
+  char a, b;
+  while (*src) {
+    if ((*src == '%') &&
+      ((a = src[1]) && (b = src[2])) &&
+      (isxdigit(a) && isxdigit(b))) {
+      if (a >= 'a')
+          a -= 'a'-'A';
+      if (a >= 'A')
+          a -= ('A' - 10);
+      else
+          a -= '0';
+      if (b >= 'a')
+          b -= 'a'-'A';
+      if (b >= 'A')
+          b -= ('A' - 10);
+      else
+          b -= '0';
+      
+      decoded += char(16*a+b);
+      src += 3;
+    } else if (*src == '+') {
+      decoded += ' ';
+      *src++;
+    } else {
+      decoded += *src;
+      *src++;
     }
-    decoded += '\0';
-    
-    return decoded;
+  }
+  decoded += '\0';
+  
+  return decoded;
 }
