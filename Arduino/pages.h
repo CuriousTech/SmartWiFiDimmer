@@ -1,658 +1,659 @@
-const char page1[] PROGMEM =
-   "<!DOCTYPE html>\n"
-   "<html lang=\"en\">\n"
-   "<head>\n"
-   "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>\n"
-   "<title>WiFi Dimmer</title>\n"
-   "<style>\n"
-   "div,table{border-radius: 3px;box-shadow: 2px 2px 12px #000000;\n"
-   "background-image: -moz-linear-gradient(top, #ffffff, #405050);\n"
-   "background-image: -ms-linear-gradient(top, #ffffff, #405050);\n"
-   "background-image: -o-linear-gradient(top, #ffffff, #405050);\n"
-   "background-image: -webkit-linear-gradient(top, #ffffff, #405050);\n"
-   "background-image: linear-gradient(top, #ffffff, #405050);\n"
-   "background-clip: padding-box;}\n"
-   "input{border-radius: 5px;box-shadow: 2px 2px 12px #000000;\n"
-   "background-image: -moz-linear-gradient(top, #ffffff, #207080);\n"
-   "background-image: -ms-linear-gradient(top, #ffffff, #207080);\n"
-   "background-image: -o-linear-gradient(top, #ffffff, #207080);\n"
-   "background-image: -webkit-linear-gradient(top, #a0c0ff, #207080);\n"
-   "background-image: linear-gradient(top, #ffffff, #207080);\n"
-   "background-clip: padding-box;}\n"
-   "body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}\n"
-   "</style>\n"
-   "<script src=\"http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js\" type=\"text/javascript\" charset=\"utf-8\"></script>\n"
-   "<script type=\"text/javascript\" src=\"data\"></script>\n"
-   "<script type=\"text/javascript\">\n"
-   "a=document.all\n"
-   "idx=0\n"
-   "nms=['OFF','ON ','LNK','REV']\n"
-   "dys=[['Sun'],['Mon'],['Tue'],['Wed'],['Thu'],['Fri'],['Sat']]\n"
-   "maxW=0\n"
-   "wArr=[]\n"
-   "function openSocket(){\n"
-   "ws=new WebSocket(\"ws://\"+window.location.host+\"/ws\")\n"
-   "//ws=new WebSocket(\"ws://192.168.31.229/ws\")\n"
-   "ws.onopen=function(evt){}\n"
-   "ws.onclose=function(evt){alert(\"Connection closed.\");}\n"
-   "ws.onmessage=function(evt){\n"
-   "console.log(evt.data)\n"
-   " lines=evt.data.split(';')\n"
-   " event=lines[0]\n"
-   " data=lines[1]\n"
-   " if(data.length) d=JSON.parse(data)\n"
-   " if(event=='state'){\n"
-   "d2=new Date(d.t*1000)\n"
-   "a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)\n"
-   "a.RLY.value=nms[d.on]\n"
-   "a.RLY.setAttribute('style',d.on?'color:red':'')\n"
-   "a.LED1.value=nms[d.l1]\n"
-   "a.LED1.setAttribute('style',d.l1?'color:blue':'')\n"
-   "a.LED2.value=nms[d.l2]\n"
-   "a.LED2.setAttribute('style',d.l2?'color:blue':'')\n"
-   "a.LVL.value=d.lvl\n"
-   "a.level.value=d.lvl\n"
-   "a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()\n"
-   "if(d.lvl==0)\n"
-   "{\n"
-   " a.LVL.style.visibility='hidden'\n"
-   " a.level.style.visibility='hidden'\n"
-   " for(i=0;i<item.length;i++)\n"
-   "  document.getElementById('L'+i).style.visibility='hidden'\n"
-   " a.header.innerHTML=' &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; '\n"
-   "}\n"
-   "a.MOT.setAttribute('bgcolor',d.mo?'red':'')\n"
-   "if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')\n"
-   " }\n"
-   " else if(event=='energy')\n"
-   " {\n"
-   "d2=new Date(d.t*1000)\n"
-   "a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)\n"
-   "rs=d.rssi+'dB'\n"
-   "if(d.v){rs+=' &nbsp;&nbsp;'+d.v.toFixed(2)+'V';a.watts.value=d.p}\n"
-   "a.rssi.innerHTML=rs\n"
-   "a.v.innerHTML='&nbsp;&nbsp;'+d.c+'A'\n"
-   "a.wh.value=d.wh.toFixed(2)\n"
-   "a.cost.value=((+d.wh)*(+a.ppkw.value/1000)).toFixed(3)\n"
-   "draw_point(d.p)\n"
-   " }\n"
-   " else if(event=='update')\n"
-   " {\n"
-   " switch(d.type)\n"
-   " {\n"
-   "   case 'hour':\n"
-   "hours[d.e][0]=d.sec\n"
-   "hours[d.e][1]=d.p\n"
-   "break\n"
-   "   case 'day':\n"
-   "days[d.e][0]=d.sec\n"
-   "days[d.e][1]=d.p\n"
-   "break\n"
-   "}\n"
-   "update_bars()\n"
-   " }\n"
-   " else if(event=='alert'){alert(data)}\n"
-   "}\n"
-   "}\n"
-   "function setVar(varName, value)\n"
-   "{\n"
-   " ws.send('cmd;{\"key\":\"'+a.myKey.value+'\",\"'+varName+'\":'+value+'}')\n"
-   "}\n"
-   "function manual()\n"
-   "{\n"
-   "on=(a.RLY.value=='OFF')\n"
-   "setVar('on',on)\n"
-   "a.RLY.value=on?'ON ':'OFF'\n"
-   "a.RLY.setAttribute('style',on?'color:red':'')\n"
-   "}\n"
-   "\n"
-   "function pf()\n"
-   "{\n"
-   "if(a.PF.value=='LAST') l=1\n"
-   "else if(a.PF.value=='OFF ') l=2\n"
-   "else l=0\n"
-   "setVar('powerup',l)\n"
-   "pus=['LAST','OFF ',' ON ']\n"
-   "a.PF.value=pus[l]\n"
-   "}\n"
-   "\n"
-   "function led1()\n"
-   "{\n"
-   "if(a.LED1.value=='OFF') l=1\n"
-   "else if(a.LED1.value=='ON ') l=2\n"
-   "else if(a.LED1.value=='LNK') l=3\n"
-   "else l=0\n"
-   "setVar('led1',l)\n"
-   "a.LED1.value=nms[l]\n"
-   "a.LED1.setAttribute('style',l?'color:blue':'')\n"
-   "}\n"
-   "function led2()\n"
-   "{\n"
-   "if(a.LED2.value=='OFF') l=1\n"
-   "else if(a.LED2.value=='ON ') l=2\n"
-   "else if(a.LED2.value=='LNK') l=3\n"
-   "else l=0\n"
-   "setVar('led2',l)\n"
-   "a.LED2.value=nms[l]\n"
-   "a.LED2.setAttribute('style',l?'color:blue':'')\n"
-   "}\n"
-   "\n"
-   "function t2hms(t)\n"
-   "{\n"
-   "s=t%60\n"
-   "t=Math.floor(t/60)\n"
-   "if(t==0) return s\n"
-   "if(s<10) s='0'+s\n"
-   "m=t%60\n"
-   "t=Math.floor(t/60)\n"
-   "if(t==0) return m+':'+s\n"
-   "if(m<10) m='0'+m\n"
-   "h=t%24\n"
-   "t=Math.floor(t/24)\n"
-   "if(t==0) return h+':'+m+':'+s\n"
-   "return t+'d '+h+':'+m+':'+s\n"
-   "}\n"
-   "\n"
-   "function hms2t(s)\n"
-   "{\n"
-   "ar=s.split(':')\n"
-   "t=0\n"
-   "for(i=0;i<ar.length;i++){t*=60;t+=+ar[i]}\n"
-   "return t\n"
-   "}\n"
-   "\n"
-   "function setData(ent)\n"
-   "{\n"
-   " id=ent.id.substr(0,1)\n"
-   " idx=ent.id.substr(1)\n"
-   " setVar('I',idx)\n"
-   " switch(id)\n"
-   " {\n"
-   " case 'N':\n"
-   "  setVar('N',item[idx][0]=document.getElementById('N'+idx).value)\n"
-   "   break\n"
-   "case 'W':\n"
-   "  wks=document.getElementsByName('W'+idx)\n"
-   "  w=0\n"
-   "  for(wd=0;wd<10;wd++) if(wks[wd].checked) w|=(1<<wd)\n"
-   "  setVar('W',w)\n"
-   "      item[idx][3]=w\n"
-   "  break\n"
-   "case 'S':\n"
-   "  setVar('S',item[idx][1]=hms2t(document.getElementById('S'+it).value))\n"
-   "  break\n"
-   "case 'T':\n"
-   "      setVar('T',item[idx][2]=hms2t(document.getElementById('T'+it).value))\n"
-   "      break\n"
-   "    case 'L':\n"
-   "      setVar('L',item[it][4]=document.getElementById('L'+it).value)\n"
-   "  break\n"
-   "  }\n"
-   "  if(item[item.length-1][0]!='')\n"
-   "  {\n"
-   "   item.push(['',60,60,255])\n"
-   "   AddEntry(item[item.length-1])\n"
-   "  }\n"
-   "}\n"
-   "\n"
-   "function togCall()\n"
-   "{\n"
-   "  on=(a.CH.value=='OFF')?1:0\n"
-   "  a.CH.value=nms[on]\n"
-   "  a.CH.setAttribute('style',on?'color:red':'')\n"
-   "  if(on) setVar('hostip',80)\n"
-   "  else setVar('ch',0)\n"
-   "}\n"
-   "\n"
-   "function slide()\n"
-   "{\n"
-   " lvl=a.level.value\n"
-   " a.LVL.value=lvl\n"
-   " setVar('lvl',lvl)\n"
-   "}\n"
-   "\n"
-   "function setDelay()\n"
-   "{\n"
-   "  setVar('dly',hms2t(a.dly.value))\n"
-   "}\n"
-   "\n"
-   "function setAuto()\n"
-   "{\n"
-   "  setVar('auto',hms2t(a.auto.value))\n"
-   "}\n"
-   "\n"
-   "function setMTime()\n"
-   "{\n"
-   "  setVar('MOT',hms2t(a.mtime.value))\n"
-   "}\n"
-   "\n"
-   "function clearWh()\n"
-   "{\n"
-   "  setVar('rt',0)\n"
-   "  a.cost.value='0.000'\n"
-   "  a.wh.value='0.00'\n"
-   "}\n"
-   "\n"
-   "function changeNm()\n"
-   "{\n"
-   "  setVar('name',a.nm.value)\n"
-   "}\n"
-   "\n"
-   "function fillData()\n"
-   "{\n"
-   "  a.TZ.value=data.tz\n"
-   "  a.nm.value=data.name\n"
-   "  document.title=data.name\n"
-   "  a.mtime.value=t2hms(data.mot)\n"
-   "  a.auto.value=t2hms(data.auto)\n"
-   "  a.CH.value=data.ch?' ON ':'OFF'\n"
-   "  pus=['LAST','OFF ',' ON ']\n"
-   "  a.PF.value=pus[data.pu]\n"
-   "  a.CH.setAttribute('style',data.ch?'color:red':'')\n"
-   "  a.watts.value=data.watt\n"
-   "  a.ppkw.value=data.ppkw/1000\n"
-   "  for(it=0;it<item.length;it++)\n"
-   "  AddEntry(item[it])\n"
-   "  idx=0\n"
-   "  for(d=0;d<dev.length;d++)\n"
-   "  AddDev(dev[d])\n"
-   "}\n"
-   "\n"
-   "function AddEntry(arr)\n"
-   "{\n"
-   "  td=document.createElement(\"td\")\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.id='N'+idx\n"
-   "  inp.type='text'\n"
-   "  inp.size=8\n"
-   "  inp.value=arr[0]\n"
-   "  inp.onchange=function(){setData(this);}\n"
-   "\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  for(i=0;i<10;i++){\n"
-   "inp=document.createElement(\"input\")\n"
-   "inp.type='checkbox'\n"
-   "inp.id='W'+idx\n"
-   "inp.name='W'+idx\n"
-   "inp.checked=(arr[3]&(1<<i))\n"
-   "inp.onclick=function(){setData(this);}\n"
-   "td.appendChild(inp)\n"
-   "  }\n"
-   "\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.id='S'+idx\n"
-   "  inp.type='text'\n"
-   "  inp.value=t2hms(arr[1])\n"
-   "  inp.size=3\n"
-   "  inp.onchange=function(){setData(this);}\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.id='T'+idx\n"
-   "  inp.type='text'\n"
-   "  t=t2hms(arr[2])\n"
-   "  inp.value=(t)?t:''\n"
-   "  inp.size=2\n"
-   "  inp.onchange=function(){setData(this);}\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.id='L'+idx\n"
-   "  inp.type='text'\n"
-   "  inp.value=arr[4]?arr[4]:''\n"
-   "  inp.size=1\n"
-   "  inp.onchange=function(){setData(this);}\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  tr=document.createElement(\"tr\")\n"
-   "  tr.id='r'+idx\n"
-   "  tr.appendChild(td)\n"
-   "  tbody=document.createElement(\"tbody\")\n"
-   "  tbody.id='tbody'+idx\n"
-   "  tbody.appendChild(tr)\n"
-   "  a.list.appendChild(tbody)\n"
-   "  idx++\n"
-   "}\n"
-   "\n"
-   "function changeDev(dev)\n"
-   "{\n"
-   " idx=dev.id.split('-')\n"
-   " val=document.getElementById(dev.id).value\n"
-   " switch(idx[0])\n"
-   " {\n"
-   " case 'DE':\n"
-   "   s=document.getElementById('IP-'+idx[1]).innerHTML\n"
-   "   window.location.href='http://'+s\n"
-   "   break\n"
-   " case 'ON':\n"
-   "   mode=0\n"
-   "      if(val=='------'){ document.getElementById(dev.id).value='LNK'; mode=1}\n"
-   "      else if(val=='LNK'){document.getElementById(dev.id).value='REV'; mode=2}\n"
-   "   else document.getElementById(dev.id).value='------'\n"
-   "  setVar('DEV',idx[1])\n"
-   "  setVar('MODE',mode)\n"
-   "   break\n"
-   " case 'CK':\n"
-   "  cb=document.getElementsByName('CK-'+idx[1])\n"
-   "  setVar('DEV',idx[1])\n"
-   "  setVar('DIM',(cb[0].checked)?1:0)\n"
-   "  setVar('OP',(cb[1].checked)?1:0)\n"
-   "   break\n"
-   " case 'DLY':\n"
-   "  setVar('DEV',idx[1])\n"
-   "  setVar('DLY',hms2t(val))\n"
-   "   break\n"
-   " }\n"
-   "}\n"
-   "\n"
-   "// \"name\",\"192.168.0.122\",mode,flags,dly\n"
-   "function AddDev(arr)\n"
-   "{\n"
-   "  td=document.createElement(\"td\")\n"
-   "  td.align=\"center\"\n"
-   "\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.id='DE-'+idx\n"
-   "  inp.type='button'\n"
-   "  inp.style.width='105px'\n"
-   "  inp.value=arr[0]\n"
-   "  inp.onclick=function(){changeDev(this); }\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  inp=document.createElement(\"button\")\n"
-   "  inp.id='IP-'+idx\n"
-   "  inp.border=1\n"
-   "  inp.style.width='105px'\n"
-   "  inp.type='text'\n"
-   "  inp.innerHTML=arr[1]\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.id='ON-'+idx\n"
-   "  inp.type='button'\n"
-   "  nams=['------','LNK','REV']\n"
-   "  inp.value=nams[arr[2]]\n"
-   "  inp.onclick=function(){changeDev(this); }\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  for(i=0;i<2;i++)\n"
-   "  {\n"
-   "inp=document.createElement(\"input\")\n"
-   "inp.id='CK-'+idx\n"
-   "inp.name='CK-'+idx\n"
-   "inp.type='checkbox'\n"
-   "inp.checked=(arr[3]&(1<<i))?1:0\n"
-   "inp.onclick=function(){changeDev(this); }\n"
-   "td.appendChild(inp)\n"
-   "  }\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.id='DLY-'+idx\n"
-   "  inp.type='text'\n"
-   "  inp.size=3\n"
-   "  inp.value=t2hms(arr[4])\n"
-   "  inp.onchange=function(){changeDev(this); }\n"
-   "  td.appendChild(inp)\n"
-   "\n"
-   "  tr=document.createElement(\"tr\")\n"
-   "  tr.id='dv'+idx\n"
-   "  tr.appendChild(td)\n"
-   "  tbody=document.createElement(\"tbody\")\n"
-   "  tbody.id='tbody'+idx\n"
-   "  tbody.appendChild(tr)\n"
-   "  a.dev.appendChild(tbody)\n"
-   "  idx++\n"
-   "}\n"
-   "\n"
-   "function draw_point(wt){\n"
-   "try {\n"
-   "var c=document.getElementById('chart')\n"
-   "ctx=c.getContext(\"2d\")\n"
-   "ctx.fillStyle=\"#225\"\n"
-   "ht=(c.height/4)-2\n"
-   "ctx.fillRect(0,0,c.width,ht+2)\n"
-   "\n"
-   "    date = new Date()\n"
-   "if(wt>maxW) maxW=wt\n"
-   "ctx.textAlign=\"left\"\n"
-   "ctx.fillStyle=\"#888\"\n"
-   "ctx.fillText(maxW.toFixed(2),1,8)\n"
-   "ctx.fillText((maxW/2).toFixed(2),1,ht/2+4)\n"
-   "ctx.strokeStyle=\"#888\"\n"
-   "ctx.lineWidth=0.4\n"
-   "ctx.beginPath()\n"
-   "ctx.moveTo(30,ht/2)\n"
-   "ctx.lineTo(c.width-3,ht/2)\n"
-   "ctx.stroke()\n"
-   "ctx.textAlign=\"right\"\n"
-   "cp=date.getMinutes()*60+date.getSeconds()\n"
-   "wArr[cp]=wt\n"
-   "ctx.strokeStyle=\"#EEE\"\n"
-   "ctx.lineWidth=0.4\n"
-   "ctx.beginPath()\n"
-   "x=cp*c.width/3600\n"
-   "ctx.moveTo(x,0)\n"
-   "ctx.lineTo(x,ht)\n"
-   "ctx.stroke()\n"
-   "ctx.strokeStyle=\"#F55\"\n"
-   "ctx.fillStyle=\"#FFF\"\n"
-   "ctx.lineWidth=1.5\n"
-   "mvd=0\n"
-   "t=0\n"
-   "for(i=0;i<3600;i++)\n"
-   "{\n"
-   "if(wArr[i]!=undefined)\n"
-   "{\n"
-   "x=i*c.width/3600\n"
-   "    y=wArr[i]*(ht-2)/maxW\n"
-   "t+=wArr[i]\n"
-   "if(!mvd){ctx.beginPath();ctx.moveTo(x,ht-y)}\n"
-   "else ctx.lineTo(x,ht-y)\n"
-   "    if(i==cp){mvd=false;ctx.stroke()}\n"
-   "else mvd=true\n"
-   "}\n"
-   "if((i%600)==0) ctx.fillText(i/60,i*c.width/3600,ht)\n"
-   "}\n"
-   "ctx.stroke()\n"
-   "ctx.fillText((t/1000).toFixed(2)+' Wh',c.width-1,8)\n"
-   "ctx.fillText('$'+(t/1000*(+a.ppkw.value/1000)).toFixed(3),c.width-1,18)\n"
-   "}catch(err){}\n"
-   "}\n"
-   "\n"
-   "function update_bars()\n"
-   "{\n"
-   "var c=document.getElementById('chart')\n"
-   "ctx=c.getContext(\"2d\")\n"
-   "ht=c.height/4\n"
-   "ctx.fillStyle=\"#FFF\"\n"
-   "ctx.font=\"10px sans-serif\"\n"
-   "\n"
-   "    dots=[]\n"
-   "    date = new Date()\n"
-   "ctx.lineWidth=10\n"
-   "draw_scale(hours,c.width,ht,ht+3,0,date.getHours())\n"
-   "ctx.lineWidth=7\n"
-   "draw_scale(days,c.width,ht,ht*2+3,1,date.getDate()-1)\n"
-   "ctx.lineWidth=15\n"
-   "draw_scale(months,c.width,ht,ht*3+3,1,date.getMonth())\n"
-   "}\n"
-   "\n"
-   "$(document).ready(function(){\n"
-   "try {\n"
-   "key=localStorage.getItem('key')\n"
-   "if(key!=null) document.getElementById('myKey').value=key\n"
-   "openSocket()\n"
-   "fillData()\n"
-   "\n"
-   "    graph = $('#chart')\n"
-   "var c=document.getElementById('chart')\n"
-   "rect=c.getBoundingClientRect()\n"
-   "canvasX=rect.x\n"
-   "canvasY=rect.y\n"
-   "\n"
-   "    tipCanvas=document.getElementById(\"tip\")\n"
-   "    tipCtx=tipCanvas.getContext(\"2d\")\n"
-   "    tipDiv=document.getElementById(\"popup\")\n"
-   "\n"
-   "ctx=c.getContext(\"2d\")\n"
-   "ht=c.height/4\n"
-   "ctx.fillStyle=\"#FFF\"\n"
-   "ctx.font=\"10px sans-serif\"\n"
-   "\n"
-   "    dots=[]\n"
-   "    date = new Date()\n"
-   "ctx.lineWidth=10\n"
-   "draw_scale(hours,c.width,ht,ht+3,0,date.getHours())\n"
-   "ctx.lineWidth=7\n"
-   "draw_scale(days,c.width,ht,ht*2+3,1,date.getDate()-1)\n"
-   "ctx.lineWidth=15\n"
-   "draw_scale(months,c.width,ht,ht*3+3,1,date.getMonth())\n"
-   "\n"
-   "// request mousemove events\n"
-   "graph.mousemove(function(e){handleMouseMove(e);})\n"
-   "\n"
-   "// show tooltip when mouse hovers over dot\n"
-   "function handleMouseMove(e){\n"
-   "rect=c.getBoundingClientRect()\n"
-   "mouseX=e.clientX-rect.x\n"
-   "mouseY=e.clientY-rect.y\n"
-   "var hit = false\n"
-   "for(i=0;i<dots.length;i++){\n"
-   "dot = dots[i]\n"
-   "if(mouseX>=dot.x && mouseX<=dot.x2 && mouseY>=dot.y && mouseY<=dot.y2){\n"
-   "tipCtx.clearRect(0,0,tipCanvas.width,tipCanvas.height)\n"
-   "tipCtx.fillStyle=\"#FFA\"\n"
-   "tipCtx.lineWidth = 2\n"
-   "tipCtx.fillStyle = \"#000000\"\n"
-   "tipCtx.strokeStyle = '#333'\n"
-   "tipCtx.font = 'bold italic 10pt sans-serif'\n"
-   "tipCtx.textAlign = \"left\"\n"
-   "tipCtx.fillText(t2hms(dot.tip),4,15)\n"
-   "if(+dot.tip2>1000)\n"
-   " txt=(dot.tip2/1000).toFixed(1)+' KWh'\n"
-   "else\n"
-   " txt=dot.tip2+' Wh'\n"
-   "tipCtx.fillText(txt, 4, 29)\n"
-   "tipCtx.fillText('$'+(dot.tip2*(+a.ppkw.value/1000)).toFixed(3),4,44)\n"
-   "hit=true\n"
-   "popup=document.getElementById(\"popup\")\n"
-   "popup.style.top=(dot.y+rect.y+window.pageYOffset)+\"px\"\n"
-   "popup.style.left=(dot.x+rect.x-60)+\"px\"\n"
-   "}\n"
-   "}\n"
-   "if(!hit) popup.style.left=\"-200px\"\n"
-   "}\n"
-   "\n"
-   "function getMousePos(cDom, mEv){\n"
-   "rect = cDom.getBoundingClientRect();\n"
-   "return{\n"
-   " x: mEv.clientX-rect.left,\n"
-   " y: mEv.clientY-rect.top\n"
-   "}\n"
-   "}\n"
-   "\n"
-   "}catch(err){}\n"
-   "})\n"
-   "\n"
-   "function draw_scale(arr,w,h,o,p,hi)\n"
-   "{\n"
-   "ctx.fillStyle=\"#336\"\n"
-   "ctx.fillRect(0,o,w,h-3)\n"
-   "ctx.fillStyle=\"#FFF\"\n"
-   "max=0\n"
-   "tot=0\n"
-   "for(i=0;i<arr.length;i++)\n"
-   "{\n"
-   "if(arr[i][1]>max) max=arr[i][1]\n"
-   "tot+=arr[i][1]\n"
-   "}\n"
-   "ctx.textAlign=\"center\"\n"
-   "for(i=0;i<arr.length;i++)\n"
-   "{\n"
-   "x=i*(w/arr.length)+8\n"
-   "ctx.strokeStyle=\"#55F\"\n"
-   "    bh=arr[i][1]*(h-20)/max\n"
-   "    y=(o+h-20)-bh\n"
-   "ctx.beginPath()\n"
-   "    ctx.moveTo(x,o+h-20)\n"
-   "    ctx.lineTo(x,y)\n"
-   "ctx.stroke()\n"
-   "ctx.strokeStyle=\"#FFF\"\n"
-   "ctx.fillText(i+p,x,o+h-7)\n"
-   "if(i==hi)\n"
-   "{\n"
-   "lw=ctx.lineWidth\n"
-   "ctx.strokeStyle=\"#000\"\n"
-   "ctx.lineWidth=1\n"
-   "ctx.beginPath()\n"
-   "    ctx.moveTo(x+lw+1,o+h-20)\n"
-   "    ctx.lineTo(x+lw+1,o)\n"
-   "ctx.stroke()\n"
-   "ctx.lineWidth=lw\n"
-   "}\n"
-   "if(bh<16) bh=16\n"
-   "if(arr[i][0])\n"
-   "  dots.push({\n"
-   "x: x-(ctx.lineWidth/2),\n"
-   "y: y,\n"
-   "y2: y+bh,\n"
-   "x2: x+ctx.lineWidth,\n"
-   "tip: arr[i][0],\n"
-   "tip2: arr[i][1]\n"
-   "})\n"
-   "}\n"
-   "ctx.textAlign=\"right\"\n"
-   "if(tot>1000)\n"
-   " txt=(tot/1000).toFixed(1)+' KWh'\n"
-   "else\n"
-   " txt=tot.toFixed(1)+' Wh'\n"
-   "ctx.fillText(txt,w-1,o+10)\n"
-   "ctx.fillText('$'+(tot*(+a.ppkw.value/1000)).toFixed(3) ,w-1,o+21)\n"
-   "}\n"
-   "</script>\n"
-   "<style type=\"text/css\">\n"
-   "#popup {\n"
-   "  position: absolute;\n"
-   "  top: 150px;\n"
-   "  left: -150px;\n"
-   "  z-index: 10;\n"
-   "  border-style: solid;\n"
-   "  border-width: 1px;\n"
-   "}\n"
-   "</style>\n"
-   "</head>\n"
-   "<body bgcolor=\"silver\">\n"
-   "<table align=\"right\" width=450>\n"
-   "<tr><td>Power</td><td>LED1 &nbsp LED2</td><td><input id=\"nm\" type=text size=8 onchange=\"changeNm();\"></td><td><div id=\"time\"></div></td></tr>\n"
-   "<tr><td><input name=\"RLY\" value=\"OFF\" type='button' onclick=\"{manual()}\"></td>\n"
-   "<td><input name=\"LED1\" value=\"OFF\" type='button' onclick=\"{led1()}\">&nbsp <input name=\"LED2\" value=\"OFF\" type='button' onclick=\"{led2()}\"></td>\n"
-   "<td colspan=2><label for=\"CH\">Rpt</label><input name=\"CH\" value=\"OFF\" type='button' onclick=\"{togCall()}\"> Auto Off <input name=\"auto\" type=\"text\" value=\"0\" size=\"4\" onchange=\"setAuto();\">\n"
-   " &nbsp TZ<input name=\"TZ\" type=text size=1 value='-5' onchange=\"setVar('TZ', this.value);\"></td></tr>\n"
-   "<tr>\n"
-   "<td colspan=4>Start <input name=\"PF\" value=\"LAST\" type='button' onclick=\"{pf()}\"> &nbsp;<input name=\"LVL\" value=\"99\" type='text' size=\"2\"> &nbsp <input type=\"range\" id=\"level\" name=\"level\" min=1 max=200 onchange=\"slide();\">\n"
-   "&nbsp; <input name=\"dly\" type=\"text\" value=\"0\" size=\"4\"><input value=\"Delay On\" type='button' onclick=\"{setDelay()}\"></td></tr>\n"
-   "</table>\n"
-   "<table align=\"right\" style=\"font-size:small\" id=\"list\">\n"
-   "<tr><td id=\"header\" align=\"center\"> &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp Level</td></tr>\n"
-   "</table>\n"
-   "<table width=450 align=\"right\" style=\"font-size:small\" id=\"dev\"><tr><td align=\"center\">&#8195; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &#8195; &nbsp; Mode Dim Mt Delay &nbsp; </td></tr></table>\n"
-   "<table align=\"right\" width=450>\n"
-   "<tr><td>PPKWH<input name=\"ppkw\" type=text size=3 onchange=\"setVar('ppkw',+this.value*1000);\"></td><td>\n"
-   "<div id=\"v\" style=\"width:50px\"></div></td><td>Watts<input name=watts type=text size=1 onchange=\"setVar('watts',this.value);\">WH<input id=\"wh\" name=\"wh\" type=button size=8 onclick=\"clearWh();\"> $<input id=\"cost\" name=\"cost\" type=button size=8 onclick=\"clearWh();\"></td></tr>\n"
-   "<tr><td><div id=\"rssi\">0db</div></td><td colspan=2><div id=\"ts\">1:00:00</div></td></tr>\n"
-   "<tr><td id=\"MOT\">Motion<input name=\"mtime\" type=text size=4 style=\"width: 60px\" onchange=\"setMTime();\"></td><td colspan=2>\n"
-   " <input value='Restart' type=button onclick=\"setVar('reset',0);\"> &nbsp; \n"
-   " <input id=\"myKey\" name=\"key\" type=text size=50 placeholder=\"password\" style=\"width: 128px\" onChange=\"{localStorage.setItem('key', key = document.all.myKey.value)}\">\n"
-   "</td></tr>\n"
-   "</table>\n"
-   "<table align=\"right\" width=450>\n"
-   "<tr><td>\n"
-   "<div id=\"wrapper\">\n"
-   "<canvas id=\"chart\" width=\"444\" height=\"400\"></canvas>\n"
-   "<div id=\"popup\"><canvas id=\"tip\" width=70 height=58></canvas></div>\n"
-   "</td></tr>\n"
-   "</table></div></body>\n"
-   "</html>\n";
+const char page1[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WiFi Dimmer</title>
+<style>
+div,table{border-radius: 3px;box-shadow: 2px 2px 12px #000000;
+background-image: -moz-linear-gradient(top, #ffffff, #405050);
+background-image: -ms-linear-gradient(top, #ffffff, #405050);
+background-image: -o-linear-gradient(top, #ffffff, #405050);
+background-image: -webkit-linear-gradient(top, #ffffff, #405050);
+background-image: linear-gradient(top, #ffffff, #405050);
+background-clip: padding-box;}
+input{border-radius: 5px;box-shadow: 2px 2px 12px #000000;
+background-image: -moz-linear-gradient(top, #ffffff, #207080);
+background-image: -ms-linear-gradient(top, #ffffff, #207080);
+background-image: -o-linear-gradient(top, #ffffff, #207080);
+background-image: -webkit-linear-gradient(top, #a0c0ff, #207080);
+background-image: linear-gradient(top, #ffffff, #207080);
+background-clip: padding-box;}
+body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
+</style>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js" type="text/javascript" charset="utf-8"></script>
+<script type="text/javascript" src="data"></script>
+<script type="text/javascript">
+a=document.all
+idx=0
+nms=['OFF','ON ','LNK','REV']
+dys=[['Sun'],['Mon'],['Tue'],['Wed'],['Thu'],['Fri'],['Sat']]
+maxW=0
+wArr=[]
+function openSocket(){
+ws=new WebSocket("ws://"+window.location.host+"/ws")
+//ws=new WebSocket("ws://192.168.31.229/ws")
+ws.onopen=function(evt){}
+ws.onclose=function(evt){alert("Connection closed.");}
+ws.onmessage=function(evt){
+console.log(evt.data)
+ lines=evt.data.split(';')
+ event=lines[0]
+ data=lines[1]
+ d=JSON.parse(data)
+ if(event=='state'){
+  d2=new Date(d.t*1000)
+  a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
+  a.RLY.value=nms[d.on]
+  a.RLY.setAttribute('style',d.on?'color:red':'')
+  a.LED1.value=nms[d.l1]
+  a.LED1.setAttribute('style',d.l1?'color:blue':'')
+  a.LED2.value=nms[d.l2]
+  a.LED2.setAttribute('style',d.l2?'color:blue':'')
+  a.LVL.value=d.lvl
+  a.level.value=d.lvl
+  a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()
+  if(d.lvl==0)
+  {
+   a.LVL.style.visibility='hidden'
+   a.level.style.visibility='hidden'
+   for(i=0;i<item.length;i++)
+    document.getElementById('L'+i).style.visibility='hidden'
+   a.header.innerHTML=' &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; '
+  }
+  a.MOT.setAttribute('bgcolor',d.mo?'red':'')
+  if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')
+ }
+ else if(event=='energy')
+ {
+  d2=new Date(d.t*1000)
+  a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
+  rs=d.rssi+'dB'
+  if(d.v) {rs+=' &nbsp;&nbsp;'+d.v.toFixed(2)+'V';a.watts.value=d.p}
+  a.rssi.innerHTML=rs
+  a.v.innerHTML='&nbsp;&nbsp;'+d.c+'A'
+  a.wh.value=d.wh.toFixed(2)
+  a.cost.value=((+d.wh)*(+a.ppkw.value/1000)).toFixed(3)
+  draw_point(d.p)
+ }
+ else if(event=='update')
+ {
+  switch(d.type)
+  {
+    case 'hour':
+    hours[d.e][0]=d.sec
+    hours[d.e][1]=d.p
+    break
+    case 'day':
+    days[d.e][0]=d.sec
+    days[d.e][1]=d.p
+    break
+  }
+  update_bars()
+ }
+ else if(event=='alert'){alert(data)}
+}
+}
+function setVar(varName, value)
+{
+ ws.send('cmd;{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
+}
+function manual()
+{
+on=(a.RLY.value=='OFF')
+setVar('on',on)
+a.RLY.value=on?'ON ':'OFF'
+a.RLY.setAttribute('style',on?'color:red':'')
+}
+
+function pf()
+{
+if(a.PF.value=='LAST') l=1
+else if(a.PF.value=='OFF ') l=2
+else l=0
+setVar('powerup',l)
+pus=['LAST','OFF ',' ON ']
+a.PF.value=pus[l]
+}
+
+function led1()
+{
+if(a.LED1.value=='OFF') l=1
+else if(a.LED1.value=='ON ') l=2
+else if(a.LED1.value=='LNK') l=3
+else l=0
+setVar('led1',l)
+a.LED1.value=nms[l]
+a.LED1.setAttribute('style',l?'color:blue':'')
+}
+function led2()
+{
+if(a.LED2.value=='OFF') l=1
+else if(a.LED2.value=='ON ') l=2
+else if(a.LED2.value=='LNK') l=3
+else l=0
+setVar('led2',l)
+a.LED2.value=nms[l]
+a.LED2.setAttribute('style',l?'color:blue':'')
+}
+
+function t2hms(t)
+{
+  s=t%60
+  t=Math.floor(t/60)
+  if(t==0) return s
+  if(s<10) s='0'+s
+  m=t%60
+  t=Math.floor(t/60)
+  if(t==0) return m+':'+s
+  if(m<10) m='0'+m
+  h=t%24
+  t=Math.floor(t/24)
+  if(t==0) return h+':'+m+':'+s
+  return t+'d '+h+':'+m+':'+s
+}
+
+function hms2t(s)
+{
+  ar=s.split(':')
+  t=0
+  for(i=0;i<ar.length;i++){t*=60;t+=+ar[i]}
+  return t
+}
+
+function setData(ent)
+{
+ id=ent.id.substr(0,1)
+ idx=ent.id.substr(1)
+ setVar('I',idx)
+ switch(id)
+ {
+  case 'N':
+    setVar('N',item[idx][0]=document.getElementById('N'+idx).value)
+    break
+  case 'W':
+    wks=document.getElementsByName('W'+idx)
+    w=0
+    for(wd=0;wd<10;wd++) if(wks[wd].checked) w|=(1<<wd)
+    setVar('W',w)
+      item[idx][3]=w
+    break
+  case 'S':
+    setVar('S',item[idx][1]=hms2t(document.getElementById('S'+it).value))
+    break
+  case 'T':
+      setVar('T',item[idx][2]=hms2t(document.getElementById('T'+it).value))
+      break
+    case 'L':
+      setVar('L',item[it][4]=document.getElementById('L'+it).value)
+    break
+  }
+  if(item[item.length-1][0]!='')
+  {
+   item.push(['',60,60,255])
+   AddEntry(item[item.length-1])
+  }
+}
+
+function togCall()
+{
+  on=(a.CH.value=='OFF')?1:0
+  a.CH.value=nms[on]
+  a.CH.setAttribute('style',on?'color:red':'')
+  if(on) setVar('hostip',80)
+  else setVar('ch',0)
+}
+
+function slide()
+{
+ lvl=a.level.value
+ a.LVL.value=lvl
+ setVar('lvl',lvl)
+}
+
+function setDelay()
+{
+  setVar('dly',hms2t(a.dly.value))
+}
+
+function setAuto()
+{
+  setVar('auto',hms2t(a.auto.value))
+}
+
+function setMTime()
+{
+  setVar('MOT',hms2t(a.mtime.value))
+}
+
+function clearWh()
+{
+  setVar('rt',0)
+  a.cost.value='0.000'
+  a.wh.value='0.00'
+}
+
+function changeNm()
+{
+  setVar('name',a.nm.value)
+}
+
+function fillData()
+{
+  a.TZ.value=data.tz
+  a.nm.value=data.name
+  document.title=data.name
+  a.mtime.value=t2hms(data.mot)
+  a.auto.value=t2hms(data.auto)
+  a.CH.value=data.ch?' ON ':'OFF'
+  pus=['LAST','OFF ',' ON ']
+  a.PF.value=pus[data.pu]
+  a.CH.setAttribute('style',data.ch?'color:red':'')
+  a.watts.value=data.watt
+  a.ppkw.value=data.ppkw/1000
+  for(it=0;it<item.length;it++)
+    AddEntry(item[it])
+  idx=0
+  for(d=0;d<dev.length;d++)
+    AddDev(dev[d])
+}
+
+function AddEntry(arr)
+{
+  td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.id='N'+idx
+  inp.type='text'
+  inp.size=8
+  inp.value=arr[0]
+  inp.onchange=function(){setData(this);}
+
+  td.appendChild(inp)
+
+  for(i=0;i<10;i++){
+  inp=document.createElement("input")
+  inp.type='checkbox'
+  inp.id='W'+idx
+  inp.name='W'+idx
+  inp.checked=(arr[3]&(1<<i))
+  inp.onclick=function(){setData(this);}
+  td.appendChild(inp)
+  }
+
+  inp=document.createElement("input")
+  inp.id='S'+idx
+  inp.type='text'
+  inp.value=t2hms(arr[1])
+  inp.size=3
+  inp.onchange=function(){setData(this);}
+  td.appendChild(inp)
+
+  inp=document.createElement("input")
+  inp.id='T'+idx
+  inp.type='text'
+  t=t2hms(arr[2])
+  inp.value=(t)?t:''
+  inp.size=2
+  inp.onchange=function(){setData(this);}
+  td.appendChild(inp)
+
+  inp=document.createElement("input")
+  inp.id='L'+idx
+  inp.type='text'
+  inp.value=arr[4]?arr[4]:''
+  inp.size=1
+  inp.onchange=function(){setData(this);}
+  td.appendChild(inp)
+
+  tr=document.createElement("tr")
+  tr.id='r'+idx
+  tr.appendChild(td)
+  tbody=document.createElement("tbody")
+  tbody.id='tbody'+idx
+  tbody.appendChild(tr)
+  a.list.appendChild(tbody)
+  idx++
+}
+
+function changeDev(dev)
+{
+ idx=dev.id.split('-')
+ val=document.getElementById(dev.id).value
+ switch(idx[0])
+ {
+  case 'DE':
+    s=document.getElementById('IP-'+idx[1]).innerHTML
+    window.location.href='http://'+s
+    break
+  case 'ON':
+    mode=0
+      if(val=='------'){ document.getElementById(dev.id).value='LNK'; mode=1}
+      else if(val=='LNK'){document.getElementById(dev.id).value='REV'; mode=2}
+    else document.getElementById(dev.id).value='------'
+    setVar('DEV',idx[1])
+    setVar('MODE',mode)
+    break
+  case 'CK':
+    cb=document.getElementsByName('CK-'+idx[1])
+    setVar('DEV',idx[1])
+    setVar('DIM',(cb[0].checked)?1:0)
+    setVar('OP',(cb[1].checked)?1:0)
+    break
+  case 'DLY':
+    setVar('DEV',idx[1])
+    setVar('DLY',hms2t(val))
+    break
+ }
+}
+
+// "name","192.168.0.122",mode,flags,dly
+function AddDev(arr)
+{
+  td=document.createElement("td")
+  td.align="center"
+
+  inp=document.createElement("input")
+  inp.id='DE-'+idx
+  inp.type='button'
+  inp.style.width='105px'
+  inp.value=arr[0]
+  inp.onclick=function(){changeDev(this); }
+  td.appendChild(inp)
+
+  inp=document.createElement("button")
+  inp.id='IP-'+idx
+  inp.border=1
+  inp.style.width='105px'
+  inp.type='text'
+  inp.innerHTML=arr[1]
+  td.appendChild(inp)
+
+  inp=document.createElement("input")
+  inp.id='ON-'+idx
+  inp.type='button'
+  nams=['------','LNK','REV']
+  inp.value=nams[arr[2]]
+  inp.onclick=function(){changeDev(this); }
+  td.appendChild(inp)
+
+  for(i=0;i<2;i++)
+  {
+  inp=document.createElement("input")
+  inp.id='CK-'+idx
+  inp.name='CK-'+idx
+  inp.type='checkbox'
+  inp.checked=(arr[3]&(1<<i))?1:0
+  inp.onclick=function(){changeDev(this); }
+  td.appendChild(inp)
+  }
+  inp=document.createElement("input")
+  inp.id='DLY-'+idx
+  inp.type='text'
+  inp.size=3
+  inp.value=t2hms(arr[4])
+  inp.onchange=function(){changeDev(this); }
+  td.appendChild(inp)
+
+  tr=document.createElement("tr")
+  tr.id='dv'+idx
+  tr.appendChild(td)
+  tbody=document.createElement("tbody")
+  tbody.id='tbody'+idx
+  tbody.appendChild(tr)
+  a.dev.appendChild(tbody)
+  idx++
+}
+
+function draw_point(wt){
+try {
+  var c=document.getElementById('chart')
+  ctx=c.getContext("2d")
+  ctx.fillStyle="#225"
+  ht=(c.height/4)-2
+  ctx.fillRect(0,0,c.width,ht+2)
+
+    date = new Date()
+  if(wt>maxW) maxW=wt
+  ctx.textAlign="left"
+  ctx.fillStyle="#888"
+  ctx.fillText(maxW.toFixed(2),1,8)
+  ctx.fillText((maxW/2).toFixed(2),1,ht/2+4)
+  ctx.strokeStyle="#888"
+  ctx.lineWidth=0.4
+  ctx.beginPath()
+  ctx.moveTo(30,ht/2)
+  ctx.lineTo(c.width-3,ht/2)
+  ctx.stroke()
+  ctx.textAlign="right"
+  cp=date.getMinutes()*60+date.getSeconds()
+  wArr[cp]=wt
+  ctx.strokeStyle="#EEE"
+  ctx.lineWidth=0.4
+  ctx.beginPath()
+  x=cp*c.width/3600
+  ctx.moveTo(x,0)
+  ctx.lineTo(x,ht)
+  ctx.stroke()
+  ctx.strokeStyle="#F55"
+  ctx.fillStyle="#FFF"
+  ctx.lineWidth=1.5
+  mvd=0
+  t=0
+  for(i=0;i<3600;i++)
+  {
+    if(wArr[i]!=undefined)
+    {
+      x=i*c.width/3600
+        y=wArr[i]*(ht-2)/maxW
+      t+=wArr[i]
+      if(!mvd){ctx.beginPath();ctx.moveTo(x,ht-y)}
+      else ctx.lineTo(x,ht-y)
+        if(i==cp){mvd=false;ctx.stroke()}
+      else mvd=true
+    }
+    if((i%600)==0) ctx.fillText(i/60,i*c.width/3600,ht)
+  }
+  ctx.stroke()
+  ctx.fillText((t/1000).toFixed(2)+' Wh',c.width-1,8)
+  ctx.fillText('$'+(t/1000*(+a.ppkw.value/1000)).toFixed(3),c.width-1,18)
+}catch(err){}
+}
+
+function update_bars()
+{
+  var c=document.getElementById('chart')
+  ctx=c.getContext("2d")
+  ht=c.height/4
+  ctx.fillStyle="#FFF"
+  ctx.font="10px sans-serif"
+
+    dots=[]
+    date = new Date()
+  ctx.lineWidth=10
+  draw_scale(hours,c.width,ht,ht+3,0,date.getHours())
+  ctx.lineWidth=7
+  draw_scale(days,c.width,ht,ht*2+3,1,date.getDate()-1)
+  ctx.lineWidth=15
+  draw_scale(months,c.width,ht,ht*3+3,1,date.getMonth())
+}
+
+$(document).ready(function(){
+try {
+  key=localStorage.getItem('key')
+  if(key!=null) document.getElementById('myKey').value=key
+  openSocket()
+  fillData()
+
+    graph = $('#chart')
+  var c=document.getElementById('chart')
+  rect=c.getBoundingClientRect()
+  canvasX=rect.x
+  canvasY=rect.y
+
+    tipCanvas=document.getElementById("tip")
+    tipCtx=tipCanvas.getContext("2d")
+    tipDiv=document.getElementById("popup")
+
+  ctx=c.getContext("2d")
+  ht=c.height/4
+  ctx.fillStyle="#FFF"
+  ctx.font="10px sans-serif"
+
+    dots=[]
+    date = new Date()
+  ctx.lineWidth=10
+  draw_scale(hours,c.width,ht,ht+3,0,date.getHours())
+  ctx.lineWidth=7
+  draw_scale(days,c.width,ht,ht*2+3,1,date.getDate()-1)
+  ctx.lineWidth=15
+  draw_scale(months,c.width,ht,ht*3+3,1,date.getMonth())
+
+  // request mousemove events
+  graph.mousemove(function(e){handleMouseMove(e);})
+
+  // show tooltip when mouse hovers over dot
+  function handleMouseMove(e){
+    rect=c.getBoundingClientRect()
+    mouseX=e.clientX-rect.x
+    mouseY=e.clientY-rect.y
+    var hit = false
+    for(i=0;i<dots.length;i++){
+      dot = dots[i]
+      if(mouseX>=dot.x && mouseX<=dot.x2 && mouseY>=dot.y && mouseY<=dot.y2){
+        tipCtx.clearRect(0,0,tipCanvas.width,tipCanvas.height)
+        tipCtx.fillStyle="#FFA"
+        tipCtx.lineWidth = 2
+        tipCtx.fillStyle = "#000000"
+        tipCtx.strokeStyle = '#333'
+        tipCtx.font = 'bold italic 10pt sans-serif'
+        tipCtx.textAlign = "left"
+        tipCtx.fillText(t2hms(dot.tip),4,15)
+        if(+dot.tip2>1000)
+         txt=(dot.tip2/1000).toFixed(1)+' KWh'
+        else
+         txt=dot.tip2+' Wh'
+        tipCtx.fillText(txt, 4, 29)
+        tipCtx.fillText('$'+(dot.tip2*(+a.ppkw.value/1000)).toFixed(3),4,44)
+        hit=true
+        popup=document.getElementById("popup")
+        popup.style.top=(dot.y+rect.y+window.pageYOffset)+"px"
+        popup.style.left=(dot.x+rect.x-60)+"px"
+      }
+    }
+    if(!hit) popup.style.left="-200px"
+  }
+
+  function getMousePos(cDom, mEv){
+    rect = cDom.getBoundingClientRect();
+    return{
+     x: mEv.clientX-rect.left,
+     y: mEv.clientY-rect.top
+    }
+  }
+
+}catch(err){}
+})
+
+function draw_scale(arr,w,h,o,p,hi)
+{
+  ctx.fillStyle="#336"
+  ctx.fillRect(0,o,w,h-3)
+  ctx.fillStyle="#FFF"
+  max=0
+  tot=0
+  for(i=0;i<arr.length;i++)
+  {
+    if(arr[i][1]>max) max=arr[i][1]
+    tot+=arr[i][1]
+  }
+  ctx.textAlign="center"
+  for(i=0;i<arr.length;i++)
+  {
+    x=i*(w/arr.length)+8
+    ctx.strokeStyle="#55F"
+      bh=arr[i][1]*(h-20)/max
+      y=(o+h-20)-bh
+    ctx.beginPath()
+      ctx.moveTo(x,o+h-20)
+      ctx.lineTo(x,y)
+    ctx.stroke()
+    ctx.strokeStyle="#FFF"
+    ctx.fillText(i+p,x,o+h-7)
+    if(i==hi)
+    {
+      lw=ctx.lineWidth
+      ctx.strokeStyle="#000"
+      ctx.lineWidth=1
+      ctx.beginPath()
+        ctx.moveTo(x+lw+1,o+h-20)
+        ctx.lineTo(x+lw+1,o)
+      ctx.stroke()
+      ctx.lineWidth=lw
+    }
+    if(bh<16) bh=16
+    if(arr[i][0])
+      dots.push({
+      x: x-(ctx.lineWidth/2),
+      y: y,
+      y2: y+bh,
+      x2: x+ctx.lineWidth,
+      tip: arr[i][0],
+      tip2: arr[i][1]
+    })
+  }
+  ctx.textAlign="right"
+  if(tot>1000)
+   txt=(tot/1000).toFixed(1)+' KWh'
+  else
+   txt=tot.toFixed(1)+' Wh'
+  ctx.fillText(txt,w-1,o+10)
+  ctx.fillText('$'+(tot*(+a.ppkw.value/1000)).toFixed(3) ,w-1,o+21)
+}
+</script>
+<style type="text/css">
+#popup {
+  position: absolute;
+  top: 150px;
+  left: -150px;
+  z-index: 10;
+  border-style: solid;
+  border-width: 1px;
+}
+</style>
+</head>
+<body bgcolor="silver">
+<table align="right" width=450>
+<tr><td>Power</td><td>LED1 &nbsp LED2</td><td><input id="nm" type=text size=8 onchange="changeNm();"></td><td><div id="time"></div></td></tr>
+<tr><td><input name="RLY" value="OFF" type='button' onclick="{manual()}"></td>
+<td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
+<td colspan=2><label for="CH">Rpt</label><input name="CH" value="OFF" type='button' onclick="{togCall()}"> Auto Off <input name="auto" type="text" value="0" size="4" onchange="setAuto();">
+ &nbsp TZ<input name="TZ" type=text size=1 value='-5' onchange="setVar('TZ', this.value);"></td></tr>
+<tr>
+<td colspan=4>Start <input name="PF" value="LAST" type='button' onclick="{pf()}"> &nbsp;<input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min=1 max=200 onchange="slide();">
+&nbsp; <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
+</table>
+<table align="right" style="font-size:small" id="list">
+<tr><td id="header" align="center"> &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp Level</td></tr>
+</table>
+<table width=450 align="right" style="font-size:small" id="dev"><tr><td align="center">&#8195; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &#8195; &nbsp; Mode Dim Mt Delay &nbsp; </td></tr></table>
+<table align="right" width=450>
+<tr><td>PPKWH<input name="ppkw" type=text size=3 onchange="setVar('ppkw',+this.value*1000);"></td><td>
+<div id="v" style="width:50px"></div></td><td>Watts<input name=watts type=text size=1 onchange="setVar('watts',this.value);">WH<input id="wh" name="wh" type=button size=8 onclick="clearWh();"> $<input id="cost" name="cost" type=button size=8 onclick="clearWh();"></td></tr>
+<tr><td><div id="rssi">0db</div></td><td colspan=2><div id="ts">1:00:00</div></td></tr>
+<tr><td id="MOT">Motion<input name="mtime" type=text size=4 style="width: 60px" onchange="setMTime();"></td><td colspan=2>
+ <input value='Restart' type=button onclick="setVar('reset',0);"> &nbsp; 
+ <input id="myKey" name="key" type=text size=50 placeholder="password" style="width: 128px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}">
+</td></tr>
+</table>
+<table align="right" width=450>
+<tr><td>
+<div id="wrapper">
+<canvas id="chart" width="444" height="400"></canvas>
+<div id="popup"><canvas id="tip" width=70 height=58></canvas></div>
+</div></td></tr>
+</table></body>
+</html>
+)rawliteral";
 
 const uint8_t favicon[] PROGMEM = {
   0x1F, 0x8B, 0x08, 0x08, 0x70, 0xC9, 0xE2, 0x59, 0x04, 0x00, 0x66, 0x61, 0x76, 0x69, 0x63, 0x6F, 
