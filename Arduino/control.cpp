@@ -39,9 +39,9 @@ swControl::swControl()
 #endif
 }
 
-void swControl::init(uint8_t nRange)
+void swControl::init(uint8_t nUserRange)
 {
- m_nUserRange = nRange;
+ m_nUserRange = nUserRange;
  m_nLightLevel = m_nNewLightLevel = m_nUserRange / 2; // set in a callback
 #ifdef WIFI_LED
   digitalWrite(WIFI_LED, LOW);
@@ -52,6 +52,23 @@ void swControl::init(uint8_t nRange)
   Serial.swap(); // MOES v1.0 uses alt serial
 #endif
   checkStatus();
+}
+
+char *swControl::getDevice()
+{
+#if defined(MOES)
+  return "MOES";
+#elif defined(MOES2)
+  return "MOES2";
+#elif defined(GEENI)
+  return "GEENI";
+#elif defined(WIRED)
+  return "WIRED";
+#elif defined(GLASS)
+  return "GLASS";
+#else
+  return "UNKNOWN";
+#endif
 }
 
 void swControl::checkStatus()
@@ -170,6 +187,16 @@ void swControl::listen()
     if(--m_cs == 0) // keepalive
       checkStatus();
   }
+
+  if(m_nBlink)
+  {
+    static uint32_t mil;
+    if(millis() - mil > m_nBlink * 16)
+    {
+      mil = millis();
+      setLED(0, !m_bLED[0]);
+    }
+  }
 }
 
 void swControl::setSwitch(bool bOn)
@@ -196,20 +223,6 @@ void swControl::setLevel()
   data[6] = lvl >> 8;
   data[7] = lvl & 0xFF;
   writeSerial(6, data, 8);
-}
-
-void swControl::test(uint8_t cmd, uint16_t v)
-{
-  uint8_t data[8];
-  data[0] = cmd;
-  data[1] = 2; // value type
-  data[2] = 0;
-  data[3] = 4; // 4 byte value
-  data[4] = 0;
-  data[5] = 0;
-  data[6] = v >> 8;
-  data[7] = v & 0xFF;
-  writeSerial(6, data, 8); 
 }
 
 bool swControl::writeSerial(uint8_t cmd, uint8_t *p, uint16_t len)
