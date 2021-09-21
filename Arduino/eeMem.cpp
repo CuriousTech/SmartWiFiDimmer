@@ -9,7 +9,7 @@ eeSet ee = {              // Defaults for blank EEPROM
   "0.us.pool.ntp.org", 2390, -5, // NTP server, udp port, TZ
   {0}, // flags1
   "password", // device password for control
-  {192,168,0,100}, 80, // host IP and port
+  {192,168,31,100}, 80, // host IP and port
   "DiningRoom",
   0, // autoTimer
   0, // motionSecs
@@ -19,8 +19,7 @@ eeSet ee = {              // Defaults for blank EEPROM
   0, // total watts used
   0, // total seconds
   0, // total start time
-  0, // motionPin  Basement=12, LivingRoom=16 RCW-0516, Back switch=14
-  0,
+  {0,0}, // motionPin  Basement=14, LivingRoom=16 RCW-0516, Back switch=14
   {
     {  6*60,  10*60, 254, 100, "Morning"},  // time, seconds, wday, level, name
     { 12*60,  60*60, 254, 60, "Lunch"},
@@ -31,7 +30,7 @@ eeSet ee = {              // Defaults for blank EEPROM
   {0} // Energy months
 }; // 2616
 
-eeMem::eeMem()
+void eeMem::init()
 {
   EEPROM.begin(sizeof(eeSet));
 
