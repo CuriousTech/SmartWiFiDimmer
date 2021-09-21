@@ -8,16 +8,17 @@
 
 extern UdpTime utime;
 
-swControl::swControl()
-{
-}
-
 void swControl::init(uint8_t nRange)
 {
   m_nUserRange = nRange;
   digitalWrite(WIFI_LED, HIGH);
   pinMode(WIFI_LED, OUTPUT);
   Serial.begin(19200);
+}
+
+char *swControl::getDevice()
+{
+  return "PADDLE";
 }
 
 uint8_t swControl::getPower(uint8_t nLevel)
@@ -64,6 +65,16 @@ void swControl::listen()
   {
     m_nLightLevel = m_nNewLightLevel;
     setLevel();
+  }
+
+  if(m_nBlink)
+  {
+    static uint32_t mil;
+    if(millis() - mil > m_nBlink * 16)
+    {
+      mil = millis();
+      setLED(0, !m_bLED[0]);
+    }
   }
 }
 
