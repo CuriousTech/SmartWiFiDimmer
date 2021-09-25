@@ -41,9 +41,7 @@ public:
     bool connectNew(void);
     void service(void);
     void setPass(const char *p);
-    bool isCfg(void);
     int state(void);
-    void setLEDFunc(void (*pfSetLed)(uint8_t no, bool bOn) );
     String page(void);
     String urldecode(const char*);
 private:
@@ -60,7 +58,6 @@ private:
     
     const char* _apName = "no-net";
     const char *_pPass = "";
-    void (*pSetLED)(uint8_t no, bool bOn);
 };
 
 #endif
