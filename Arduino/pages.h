@@ -91,6 +91,10 @@ console.log(evt.data)
   }
   update_bars()
  }
+ else if(event=='dev')
+ {
+  document.getElementById('ON-'+d.dev).value=nms[+d.on]
+ }
  else if(event=='alert'){alert(data)}
 }
 }
@@ -208,12 +212,12 @@ function slide()
 {
  lvl=a.level.value
  a.LVL.value=lvl
- setVar('lvl',lvl)
+ setVar('level',lvl)
 }
 
 function setDelay()
 {
-  setVar('dly',hms2t(a.dly.value))
+  setVar('dlyon',hms2t(a.dly.value))
 }
 
 function setAuto()
@@ -235,7 +239,7 @@ function clearWh()
 
 function changeNm()
 {
-  setVar('name',a.nm.value)
+  setVar('devname',a.nm.value)
 }
 
 function fillData()
@@ -256,18 +260,22 @@ function fillData()
   idx=0
   for(d=0;d<dev.length;d++)
     AddDev(dev[d])
+  tr=document.createElement("tr")
+  tbody=document.createElement("tbodypad")
+  tbody.appendChild(tr)
+  a.dev.appendChild(tbody)
 }
 
 function AddEntry(arr)
 {
   td=document.createElement("td")
+
   inp=document.createElement("input")
   inp.id='N'+idx
   inp.type='text'
   inp.size=8
   inp.value=arr[0]
   inp.onchange=function(){setData(this);}
-
   td.appendChild(inp)
 
   for(i=0;i<10;i++){
@@ -325,7 +333,7 @@ function changeDev(dev)
     s=document.getElementById('IP-'+idx[1]).innerHTML
     window.location.href='http://'+s
     break
-  case 'ON':
+  case 'MD':
     mode=0
       if(val=='------'){ document.getElementById(dev.id).value='LNK'; mode=1}
       else if(val=='LNK'){document.getElementById(dev.id).value='REV'; mode=2}
@@ -342,6 +350,12 @@ function changeDev(dev)
   case 'DLY':
     setVar('DEV',idx[1])
     setVar('DLY',hms2t(val))
+    break
+  case 'ON':
+    setVar('DEV',idx[1])
+    v=(val=='OFF')?1:0
+    setVar('DON',v)
+    document.getElementById(dev.id).value=nms[v]
     break
  }
 }
@@ -369,7 +383,7 @@ function AddDev(arr)
   td.appendChild(inp)
 
   inp=document.createElement("input")
-  inp.id='ON-'+idx
+  inp.id='MD-'+idx
   inp.type='button'
   nams=['------','LNK','REV']
   inp.value=nams[arr[2]]
@@ -392,6 +406,14 @@ function AddDev(arr)
   inp.size=3
   inp.value=t2hms(arr[4])
   inp.onchange=function(){changeDev(this); }
+  td.appendChild(inp)
+
+  inp=document.createElement("input")
+  inp.id='ON-'+idx
+  inp.type='button'
+  inp.style.width='40px'
+  inp.value=nms[arr[5]]
+  inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
 
   tr=document.createElement("tr")
