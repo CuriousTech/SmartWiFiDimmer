@@ -46,7 +46,7 @@ bool swControl::listen()
   static long debounce;
   static long lRepeatMillis;
   static bool bRepeat;
-  static uint8_t nRepCnt;
+  static uint8_t nRepCnt = 60; // bad fix for start issue
 
 #define REPEAT_DELAY 300 // increase for slower repeat
 
@@ -57,6 +57,7 @@ bool swControl::listen()
     debounce = millis(); // reset on state change
 
   bool bInvoke = false;
+
   if((millis() - debounce) > 30)
   {
     if(bNewState != bState) // press or release
@@ -64,13 +65,15 @@ bool swControl::listen()
       bState = bNewState;
       if (bState == LOW) // pressed
       {
-        lRepeatMillis = millis(); // initial increment (doubled)
+        lRepeatMillis = millis(); // initial increment
+        nRepCnt = 0;
       }
       else // release
       {
         if(nRepCnt)
         {
-          if(nRepCnt > 1)
+          if(nRepCnt > 50); // first is bad
+          else if(nRepCnt > 1)
             m_bOption = true;
         }
         else
@@ -99,7 +102,8 @@ bool swControl::listen()
 
   if(bInvoke)
   {
-    setSwitch( !digitalRead(RELAY) ); // toggle      
+    m_bLightOn = !m_bLightOn;
+    setSwitch( m_bLightOn ); // toggle
   }
   lbState = bNewState;
 
