@@ -33,11 +33,6 @@ void WiFiManager::autoConnect(char const *apName, const char *pPass)
   }
 }
 
-void WiFiManager::setLEDFunc(void (*pfSetLed)(uint8_t no, bool bOn) )
-{
-  pSetLED = pfSetLed;
-}
-
 // Start AP mode
 void WiFiManager::startAP()
 {
@@ -59,12 +54,6 @@ void WiFiManager::startAP()
 int WiFiManager::state()
 {
   return _state;
-}
-
-// returns true if in config/AP mode
-bool WiFiManager::isCfg(void)
-{
-  return (_state == ws_config);
 }
 
 // returns true once after a connection is made (for time)
@@ -102,7 +91,6 @@ void WiFiManager::service()
 #ifdef DEBUG
       Serial.print(".");
 #endif
-      if(pSetLED) pSetLED(0, bBlink = !bBlink);
       if(_timer)
       {
         if (WiFi.status() == WL_CONNECTED)
@@ -127,7 +115,6 @@ void WiFiManager::service()
 
   if(_state != ws_config)
     return;
-  if(pSetLED) pSetLED(0, bBlink = !bBlink);
   if(--s)
     return;
   s = 60;
