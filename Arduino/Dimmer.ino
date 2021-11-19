@@ -38,10 +38,21 @@ SOFTWARE.
 #include <ArduinoOTA.h>
 #endif
 #include "pages.h"
-#include "control.h"
 #include <JsonParse.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonParse
 #include <JsonClient.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonClient
 #include "jsonstring.h"
+
+//#include "Tuya.h"
+//Tuya cont;
+
+//#include "Module.h"
+//Module cont;
+
+//#include "Switch.h"
+//Switch cont;
+
+#include "Paddle.h"
+Paddle cont;
 
 #define ESP_LED    2  // open (ESP-07 low = blue LED on)
 
@@ -74,7 +85,6 @@ JsonParse jsonParse(jsonCallback);
 void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
 JsonClient jsonPush(jsonPushCallback);
 
-swControl cont;
 bool bQuery;
 bool bKeyGood;
 bool bStartQuery;
@@ -253,13 +263,10 @@ void parseParams(AsyncWebServerRequest *request)
     nWrongPass = 10;
   lastIP = request->client()->remoteIP();
 
-  char temp[100];
-
   for ( uint8_t i = 0; i < request->params(); i++ )
   {
     AsyncWebParameter* p = request->getParam(i);
-    p->value().toCharArray(temp, 100);
-    String s = wifi.urldecode(temp);
+    String s = request->urlDecode(p->value());
 
     uint8_t idx;
     for(idx = 1; jsonListCmd[idx]; idx++)
