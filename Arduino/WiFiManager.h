@@ -43,7 +43,7 @@ public:
     void setPass(const char *p);
     int state(void);
     String page(void);
-    String urldecode(const char*);
+
 private:
     int _state;
     int _timer;
