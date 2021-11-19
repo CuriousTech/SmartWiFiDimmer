@@ -6,7 +6,7 @@ eeSet ee = {              // Defaults for blank EEPROM
   0xAAAA, // checksum
   "",  // saved SSID
   "", // router password
-  "0.us.pool.ntp.org", 2390, -5, // NTP server, udp port, TZ
+  "", 2390, -5, // NTP server, udp port, TZ
   {0}, // flags1
   "password", // device password for control
   {192,168,31,100}, 80, // host IP and port
