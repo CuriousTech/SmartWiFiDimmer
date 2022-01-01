@@ -49,6 +49,15 @@ struct Device
   uint8_t flags; // DEV_FLAGS
 }; // 40
 
+struct DevState
+{
+  bool bOn;
+  uint8_t nLevel;
+  uint32_t tm;
+  bool bChanged;
+  uint8_t cmd;
+};
+
 struct Energy
 {
   float fwh;     // WH used
