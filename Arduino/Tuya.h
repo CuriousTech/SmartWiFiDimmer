@@ -15,7 +15,7 @@ public:
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
-  bool    m_bLightOn;      // state
+  bool    m_bPower;      // state
   bool    m_bLED[2];
   uint8_t m_nBlink;
   uint8_t m_nLightLevel; // current level
