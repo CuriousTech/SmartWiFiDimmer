@@ -102,8 +102,8 @@ bool Switch::listen()
 
   if(bInvoke)
   {
-    m_bLightOn = !m_bLightOn;
-    setSwitch( m_bLightOn ); // toggle
+    m_bPower = !m_bPower;
+    setSwitch( m_bPower ); // toggle
   }
   lbState = bNewState;
 
@@ -197,7 +197,7 @@ bool Switch::listen()
         break;
     }
   }
-  if((!m_bLightOn) || (millis() - timeout) > 120) // Off or no serial data/invalid header (not 555A)
+  if((!m_bPower) || (millis() - timeout) > 120) // Off or no serial data/invalid header (not 555A)
   {
     m_fPower = 0;
     m_fCurrent = 0;
@@ -222,7 +222,7 @@ bool Switch::listen()
 void Switch::setSwitch(bool bOn)
 {
   digitalWrite(RELAY, bOn);
-  m_bLightOn = bOn;
+  m_bPower = bOn;
 }
 
 void Switch::setLevel(uint8_t n)
