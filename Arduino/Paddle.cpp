@@ -43,7 +43,7 @@ void Paddle::listen()
       if((p = strstr(inBuffer, "switch")) != NULL) // "switch":"on"
       {
         bool b = (p[10] == 'n') ? true:false; // on or off
-        m_bLightOn = b;
+        m_bPower = b;
       }
       if((p = strstr(inBuffer, "bright")) != NULL) // "bright":99
       {
@@ -86,7 +86,7 @@ void Paddle::setSwitch(bool bOn)
   s += (bOn)? "on" : "off";
   s += "\"\x1B";
   Serial.write((uint8_t*)s.c_str(), s.length());
-  m_bLightOn = bOn;
+  m_bPower = bOn;
 }
 
 void Paddle::setLevel()
