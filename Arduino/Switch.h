@@ -29,7 +29,7 @@ public:
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
 
-  bool   m_bLightOn;      // power state
+  bool   m_bPower;      // power state
   bool   m_bLED[2];
   int8_t m_nLightLevel = 0; // current level (0=switch)
   float  m_fVolts = 0; // 0 = no monitor
