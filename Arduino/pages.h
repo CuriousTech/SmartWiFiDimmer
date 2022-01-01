@@ -22,17 +22,23 @@ background-clip: padding-box;}
 body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
 </style>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js" type="text/javascript" charset="utf-8"></script>
-<script type="text/javascript" src="data"></script>
 <script type="text/javascript">
 a=document.all
 idx=0
 nms=['OFF','ON ','LNK','REV']
 dys=[['Sun'],['Mon'],['Tue'],['Wed'],['Thu'],['Fri'],['Sat']]
-maxW=0
+maxW=1
 wArr=[]
+
+$(document).ready(function(){
+  key=localStorage.getItem('key')
+  if(key!=null) document.getElementById('myKey').value=key
+  openSocket()
+})
+
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.31.229/ws")
+//ws=new WebSocket("ws://192.168.31.8/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -57,8 +63,6 @@ console.log(evt.data)
   {
    a.LVL.style.visibility='hidden'
    a.level.style.visibility='hidden'
-   for(i=0;i<item.length;i++)
-    document.getElementById('L'+i).style.visibility='hidden'
    a.header.innerHTML=' &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; '
   }
   a.MOT.setAttribute('bgcolor',d.mo?'red':'')
@@ -75,6 +79,26 @@ console.log(evt.data)
   a.wh.value=d.wh.toFixed(2)
   a.cost.value=((+d.wh)*(+a.ppkw.value/1000)).toFixed(3)
   draw_point(d.p)
+ }
+ else if(event=='setup')
+ {
+  fillData(d)
+ }
+ else if(event=='hist')
+ {
+   days=d.days
+   hours=d.hours
+   months=d.months
+   drawstuff()
+ }
+ else if(event=='watts')
+ {
+   for(i=0;i<d.watts.length;i++)
+   {
+     wArr[i+d.idx]=+d.watts[i]
+     wt=+d.watts[i]
+   if(wt>maxW) maxW=wt
+   }
  }
  else if(event=='update')
  {
@@ -93,7 +117,7 @@ console.log(evt.data)
  }
  else if(event=='dev')
  {
-  document.getElementById('ON-'+d.dev).value=nms[+d.on]
+   updateDev(+d.dev,+d.on,+d.level)
  }
  else if(event=='alert'){alert(data)}
 }
@@ -173,29 +197,29 @@ function setData(ent)
  switch(id)
  {
   case 'N':
-    setVar('N',item[idx][0]=document.getElementById('N'+idx).value)
+    setVar('N',setup.sched[idx][0]=document.getElementById('N'+idx).value)
     break
   case 'W':
     wks=document.getElementsByName('W'+idx)
     w=0
     for(wd=0;wd<10;wd++) if(wks[wd].checked) w|=(1<<wd)
     setVar('W',w)
-      item[idx][3]=w
+      setup.sched[idx][3]=w
     break
   case 'S':
-    setVar('S',item[idx][1]=hms2t(document.getElementById('S'+it).value))
+    setVar('S',setup.sched[idx][1]=hms2t(document.getElementById('S'+it).value))
     break
   case 'T':
-      setVar('T',item[idx][2]=hms2t(document.getElementById('T'+it).value))
-      break
-    case 'L':
-      setVar('L',item[it][4]=document.getElementById('L'+it).value)
+    setVar('T',setup.sched[idx][2]=hms2t(document.getElementById('T'+it).value))
+    break
+  case 'L':
+    setVar('L',setup.sched[it][4]=document.getElementById('L'+it).value)
     break
   }
-  if(item[item.length-1][0]!='')
+  if(setup.sched[setup.sched.length-1][0]!='')
   {
-   item.push(['',60,60,255])
-   AddEntry(item[item.length-1])
+   setup.sched.push(['',60,60,255])
+   AddEntry(setup.sched[setup.sched.length-1])
   }
 }
 
@@ -239,27 +263,28 @@ function clearWh()
 
 function changeNm()
 {
-  setVar('devname',a.nm.value)
+  setVar('name',a.nm.value)
 }
 
-function fillData()
+function fillData(set)
 {
-  a.TZ.value=data.tz
-  a.nm.value=data.name
-  document.title=data.name
-  a.mtime.value=t2hms(data.mot)
-  a.auto.value=t2hms(data.auto)
-  a.CH.value=data.ch?' ON ':'OFF'
+  a.TZ.value=set.tz
+  a.nm.value=set.name
+  document.title=set.name
+  a.mtime.value=t2hms(set.mot)
+  a.auto.value=t2hms(set.auto)
+  a.CH.value=set.ch?' ON ':'OFF'
   pus=['LAST','OFF ',' ON ']
-  a.PF.value=pus[data.pu]
-  a.CH.setAttribute('style',data.ch?'color:red':'')
-  a.watts.value=data.watt
-  a.ppkw.value=data.ppkw/1000
-  for(it=0;it<item.length;it++)
-    AddEntry(item[it])
+  a.PF.value=pus[set.pu]
+  a.CH.setAttribute('style',set.ch?'color:red':'')
+  a.watts.value=set.watt
+  a.ppkw.value=set.ppkw/1000
+  for(it=0;it<set.sched.length;it++)
+    AddEntry(set.sched[it])
   idx=0
-  for(d=0;d<dev.length;d++)
-    AddDev(dev[d])
+  for(d=0;d<set.dev.length;d++)
+    AddDev(set.dev[d])
+
   tr=document.createElement("tr")
   tbody=document.createElement("tbodypad")
   tbody.appendChild(tr)
@@ -355,7 +380,9 @@ function changeDev(dev)
     setVar('DEV',idx[1])
     v=(val=='OFF')?1:0
     setVar('DON',v)
-    document.getElementById(dev.id).value=nms[v]
+    btn=document.getElementById(dev.id)
+    btn.value=nms[v]
+  btn.setAttribute('style',v?'color:red':'')
     break
  }
 }
@@ -413,6 +440,7 @@ function AddDev(arr)
   inp.type='button'
   inp.style.width='40px'
   inp.value=nms[arr[5]]
+  inp.setAttribute('style',arr[5]?'color:red':'')
   inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
 
@@ -422,8 +450,16 @@ function AddDev(arr)
   tbody=document.createElement("tbody")
   tbody.id='tbody'+idx
   tbody.appendChild(tr)
+
   a.dev.appendChild(tbody)
   idx++
+}
+
+function updateDev(dev,on,level)
+{
+  btn=document.getElementById('ON-'+dev)
+  btn.value=nms[on]
+  btn.setAttribute('style',on?'color:red':'')
 }
 
 function draw_point(wt){
@@ -433,8 +469,7 @@ try {
   ctx.fillStyle="#225"
   ht=(c.height/4)-2
   ctx.fillRect(0,0,c.width,ht+2)
-
-    date = new Date()
+  date=new Date()
   if(wt>maxW) maxW=wt
   ctx.textAlign="left"
   ctx.fillStyle="#888"
@@ -466,7 +501,7 @@ try {
     if(wArr[i]!=undefined)
     {
       x=i*c.width/3600
-        y=wArr[i]*(ht-2)/maxW
+      y=wArr[i]*(ht-2)/maxW
       t+=wArr[i]
       if(!mvd){ctx.beginPath();ctx.moveTo(x,ht-y)}
       else ctx.lineTo(x,ht-y)
@@ -499,14 +534,9 @@ function update_bars()
   draw_scale(months,c.width,ht,ht*3+3,1,date.getMonth())
 }
 
-$(document).ready(function(){
+function drawstuff(){
 try {
-  key=localStorage.getItem('key')
-  if(key!=null) document.getElementById('myKey').value=key
-  openSocket()
-  fillData()
-
-    graph = $('#chart')
+  graph = $('#chart')
   var c=document.getElementById('chart')
   rect=c.getBoundingClientRect()
   canvasX=rect.x
@@ -572,9 +602,8 @@ try {
      y: mEv.clientY-rect.top
     }
   }
-
 }catch(err){}
-})
+}
 
 function draw_scale(arr,w,h,o,p,hi)
 {
@@ -645,19 +674,19 @@ function draw_scale(arr,w,h,o,p,hi)
 </head>
 <body bgcolor="silver">
 <table align="right" width=450>
-<tr><td>Power</td><td>LED1 &nbsp LED2</td><td><input id="nm" type=text size=8 onchange="changeNm();"></td><td><div id="time"></div></td></tr>
+<tr><td>Power</td><td>LED1 &nbsp; LED2</td><td><input id="nm" type=text size=8 onchange="changeNm();"></td><td><div id="time"></div></td></tr>
 <tr><td><input name="RLY" value="OFF" type='button' onclick="{manual()}"></td>
-<td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
+<td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp; <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
 <td colspan=2><label for="CH">Rpt</label><input name="CH" value="OFF" type='button' onclick="{togCall()}"> Auto Off <input name="auto" type="text" value="0" size="4" onchange="setAuto();">
- &nbsp TZ<input name="TZ" type=text size=1 value='-5' onchange="setVar('TZ', this.value);"></td></tr>
+ &nbsp; TZ<input name="TZ" type=text size=1 value='-5' onchange="setVar('TZ', this.value);"></td></tr>
 <tr>
-<td colspan=4>Start <input name="PF" value="LAST" type='button' onclick="{pf()}"> &nbsp;<input name="LVL" value="99" type='text' size="2"> &nbsp <input type="range" id="level" name="level" min=1 max=200 onchange="slide();">
+<td colspan=4>Start <input name="PF" value="LAST" type='button' onclick="{pf()}"> &nbsp;<input name="LVL" value="99" type='text' size="2"> &nbsp; <input type="range" id="level" name="level" min=1 max=200 onchange="slide();">
 &nbsp; <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
 </table>
 <table align="right" style="font-size:small" id="list">
-<tr><td id="header" align="center"> &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp Level</td></tr>
+<tr><td id="header" align="center"> &nbsp; Name &nbsp; &nbsp; &nbsp; &nbsp; En Su Mo Tu We Th Fr Sa On Off &nbsp; Time &nbsp; Duration Level</td></tr>
 </table>
-<table width=450 align="right" style="font-size:small" id="dev"><tr><td align="center">&#8195; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &#8195; &nbsp; Mode Dim Mt Delay &nbsp; </td></tr></table>
+<table width=450 align="right" style="font-size:small" id="dev"><tr><td align="center">&#8195; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &#8195; &nbsp; Mode Dim Mt Delay &nbsp; ON </td></tr></table>
 <table align="right" width=450>
 <tr><td>PPKWH<input name="ppkw" type=text size=3 onchange="setVar('ppkw',+this.value*1000);"></td><td>
 <div id="v" style="width:50px"></div></td><td>Watts<input name=watts type=text size=1 onchange="setVar('watts',this.value);">WH<input id="wh" name="wh" type=button size=8 onclick="clearWh();"> $<input id="cost" name="cost" type=button size=8 onclick="clearWh();"></td></tr>
