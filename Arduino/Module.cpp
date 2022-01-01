@@ -19,7 +19,7 @@ void Module::init(uint8_t nUserRange)
 
 char *Module::getDevice()
 {
-  return "INLINE_CUBE";
+  return "DIMMER_CUBE";
 }
 
 uint8_t Module::getPower(uint8_t nLevel)
@@ -33,6 +33,7 @@ void Module::listen()
   static int cnt;
   static uint32_t tm;
   static int8_t nDirection;
+
   if(digitalRead(SWITCH_IN) == LOW) // catches at around 20-400ms
   {
     cnt++;
@@ -41,19 +42,19 @@ void Module::listen()
     {
       if(nDirection == 0) // set direction
       {
-        if(m_bLightOn == false)
-          m_bLightOn = true;
+        if(m_bPower == false)
+          m_bPower = true;
         if(m_nLightLevel < m_nUserRange)
             nDirection = 1; // up
         else
             nDirection = 2; // down
       }
-      if(nDirection == 1)
+      if(nDirection == 1) // up
       {
         if(m_nLightLevel < m_nUserRange)
           m_nLightLevel++;
       }
-      else
+      else // down
       {
         if(m_nLightLevel > 1)
           m_nLightLevel--;
@@ -63,7 +64,7 @@ void Module::listen()
   else if((millis() - tm) > 500 && cnt) // >500ms = release
   {
     if(cnt <= 4) // short tap (~100ms)
-      m_bLightOn = !m_bLightOn;
+      m_bPower = !m_bPower;
     cnt = 0;
 //    nDirection = 0; // reset will be up next time
   }
@@ -74,13 +75,13 @@ void Module::listen()
   {
     ls = s;
     uint8_t level = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
-    writeSerial( m_bLightOn ? level : 0);
+    writeSerial( m_bPower ? level : 0);
   }
 }
 
 void Module::setSwitch(bool bOn)
 {
-  m_bLightOn = bOn;
+  m_bPower = bOn;
 }
 
 bool Module::writeSerial(uint8_t level)
