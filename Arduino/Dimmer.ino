@@ -274,7 +274,8 @@ const char *jsonListCmd[] = { "cmd",
   "hostport",
   "motdly",
   "clear",
-  "query", // 40
+  "src", // 40
+  "query",
   NULL
 };
 
@@ -297,7 +298,8 @@ void parseParams(AsyncWebServerRequest *request)
     {
       int iValue = s.toInt();
       if(s == "true") iValue = 1;
-      jsonCallback(0, idx - 1, iValue, (char *)s.c_str());
+      if(i == 0 || bKeyGood)
+        jsonCallback(0, idx - 1, iValue, (char *)s.c_str());
     }
   }
 }
@@ -359,6 +361,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
   static int n;
   static int idx;
   static int dev;
+  static String src = "";
 
   switch(iEvent)
   {
@@ -376,11 +379,12 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
         case 0: // key
           if(psValue) if(!strcmp(psValue, ee.szControlPassword)) // first item must be key
             bKeyGood = true;
+          src = ""; // reset source ID
           break;
-        case 1: // wifi SSID
+        case 1: // wifi SSID from config page
           strncpy((char *)&ee.szSSID, psValue, sizeof(ee.szSSID));
           break;
-        case 2: // wifi password
+        case 2: // wifi password from config page
           wifi.setPass(psValue);
           break;
         case 3: // on
@@ -529,12 +533,31 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           memset(&ee.dev, 0, sizeof(ee.dev));
           eemem.update();
           break;
-        case 40:
+        case 40: // src : name of querying device
+          src = psValue;
+          break;
+        case 41: // query : also current state of querying device
+          if(src.length())
+            setDevState(src, iValue ? true:false);
           break;
         default:
           break;
       }
       break;
+  }
+}
+
+void setDevState(String sDev, bool bOn)
+{
+  for(int d = 0; ee.dev[d].IP[0] && d < MAX_DEV; d++)
+  {
+    if(sDev.equals(ee.dev[d].szName))
+    {
+      if(devst[d].bOn != bOn)
+        devst[d].bChanged = true;
+      devst[d].bOn = bOn;
+      break;
+    }
   }
 }
 
@@ -579,6 +602,8 @@ void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           }
           break;
         case 1: // time
+          if(iValue < 1641098500)
+            break;
           setTime(iValue + (ee.tz * 3600));
           utime.DST();
           setTime(iValue + ((ee.tz + utime.getDST()) * 3600));
@@ -701,16 +726,20 @@ void CallHost(reportReason r)
 
 void manageDevs(int dt)
 {
-  for(int i = 0; i < MAX_DEV; i++)
+  String sUri;
+
+  for(int i = 0; ee.dev[i].IP[0] && i < MAX_DEV; i++)
   {
-    if(ee.dev[i].IP[0] == 0)
-      break;
+    if(ee.dev[i].mode == 0 && ee.dev[i].flags == 0)
+      continue;
+
     IPAddress ip(ee.dev[i].IP);
-    String sUri = String("/wifi?src=");
-    sUri += ee.szName;
-    sUri += "&key=";
+    sUri = String("/wifi?key=");
     sUri += ee.szControlPassword; // assumes all paswords are the same
+    sUri += "&src=";
+    sUri += ee.szName;
     sUri += "&";
+
     if((dt & DC_LNK) && ee.dev[i].mode)
     {
       if(ee.dev[i].mode == DM_LNK) // turn other on and off
@@ -748,7 +777,11 @@ void manageDevs(int dt)
             sUri += "on=0";
           }
         }
+        else
+          continue;
       }
+      else
+        continue;
       callQueue(ip, sUri, 80);
     }
     if((dt & DC_DIM) && (ee.dev[i].flags & DF_DIM) ) // link dimmer level
@@ -773,10 +806,16 @@ void queryDevs() // checks one device per minute
   {
     if(nDev == 0)
       return;
+
     nDev = 0; // restart at dev 0
   }
   IPAddress ip(ee.dev[nDev].IP);
-  String sUri = String("/wifi?query=1");
+  String sUri = String("/wifi?key=");
+  sUri += ee.szControlPassword;  
+  sUri += "&src=";
+  sUri += ee.szName;
+  sUri += "&query=";
+  sUri += cont.m_bPower;
   if( callQueue(ip, sUri, 80) )
     nDev++;
 }
@@ -798,8 +837,11 @@ void checkDevChanges() // realtime update of device changes
     {
       String sUri = "/wifi?key=";
       sUri += ee.szControlPassword;
+      sUri += "&src=";
+      sUri += ee.szName;
       sUri += "&on=";
       sUri += devst[i].cmd - 1;
+      // Todo: send state to other device
       IPAddress ip(ee.dev[i].IP);
       callQueue(ip, sUri, 80);
       devst[i].cmd = 0;
@@ -898,7 +940,8 @@ void setup()
     parseParams(request);
     jsonString js;
     js.Var("name", ee.szName );
-    js.Var("time", (long)now() - ( (ee.tz + utime.getDST() ) * 3600) );
+    if(year() > 2020)
+      js.Var("time", (long)now() - ( (ee.tz + utime.getDST() ) * 3600) );
     js.Var("ppkw", ee.ppkw );
     js.Var("tz", ee.tz );
     js.Var("on", cont.m_bPower );
@@ -1155,7 +1198,6 @@ void loop()
       ee.nLightLevel = cont.m_nLightLevel; // update EEPROM with last settings
       ee.flags1.lightOn = cont.m_bPower;
 
-      queryDevs();
     }
 
     if(cont.m_bPower)
@@ -1173,6 +1215,13 @@ void loop()
 
     if(--ssCnt == 0)
        sendState();
+
+    static uint8_t nqCnt = 20;
+    if(--nqCnt == 0)
+    {
+      queryDevs();
+      nqCnt = 30;
+    }
 
     if(nDelayOn)
     {
