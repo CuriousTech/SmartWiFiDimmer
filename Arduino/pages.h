@@ -29,16 +29,17 @@ nms=['OFF','ON ','LNK','REV']
 dys=[['Sun'],['Mon'],['Tue'],['Wed'],['Thu'],['Fri'],['Sat']]
 maxW=1
 wArr=[]
-
+wAdr=0
 $(document).ready(function(){
   key=localStorage.getItem('key')
   if(key!=null) document.getElementById('myKey').value=key
+  for(j=0;j<60*60;j++) wArr[j]=0
   openSocket()
 })
 
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.31.8/ws")
+//ws=new WebSocket("ws://192.168.31.57/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -58,7 +59,7 @@ console.log(evt.data)
   a.LED2.setAttribute('style',d.l2?'color:blue':'')
   a.LVL.value=d.lvl
   a.level.value=d.lvl
-  a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()
+  a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since '+(new Date(d.st*1000)).toLocaleString()
   if(d.lvl==0)
   {
    a.LVL.style.visibility='hidden'
@@ -91,13 +92,26 @@ console.log(evt.data)
    months=d.months
    drawstuff()
  }
- else if(event=='watts')
+ else if(event=="watts")
  {
    for(i=0;i<d.watts.length;i++)
    {
-     wArr[i+d.idx]=+d.watts[i]
-     wt=+d.watts[i]
-   if(wt>maxW) maxW=wt
+     len=d.watts[i][0]
+     if(len>0)
+     {
+       for(j=0;j<len;j++)
+       { wt=d.watts[i][1+j]
+         wArr[wAdr++]=wt
+         if(wt>maxW) maxW=wt
+       }
+     }
+     else
+     {
+       len=-len
+       wt=d.watts[i][1]
+       for(j=0;j<len;j++) wArr[wAdr++]=wt
+       if(wt>maxW) maxW=wt
+     }
    }
  }
  else if(event=='update')
@@ -129,7 +143,7 @@ function setVar(varName, value)
 function manual()
 {
 on=(a.RLY.value=='OFF')
-setVar('on',on)
+setVar('pwr',on)
 a.RLY.value=on?'ON ':'OFF'
 a.RLY.setAttribute('style',on?'color:red':'')
 }
@@ -263,7 +277,7 @@ function clearWh()
 
 function changeNm()
 {
-  setVar('name',a.nm.value)
+  setVar('devname','"'+a.nm.value+'"')
 }
 
 function fillData(set)
@@ -483,7 +497,8 @@ try {
   ctx.stroke()
   ctx.textAlign="right"
   cp=date.getMinutes()*60+date.getSeconds()
-  wArr[cp]=wt
+  if(wArr.length >= cp)
+    wArr[cp]=wt
   ctx.strokeStyle="#EEE"
   ctx.lineWidth=0.4
   ctx.beginPath()
@@ -496,6 +511,7 @@ try {
   ctx.lineWidth=1.5
   mvd=0
   t=0
+
   for(i=0;i<3600;i++)
   {
     if(wArr[i]!=undefined)
@@ -508,6 +524,7 @@ try {
         if(i==cp){mvd=false;ctx.stroke()}
       else mvd=true
     }
+
     if((i%600)==0) ctx.fillText(i/60,i*c.width/3600,ht)
   }
   ctx.stroke()
