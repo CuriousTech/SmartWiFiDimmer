@@ -26,10 +26,11 @@ uint8_t Paddle::getPower(uint8_t nLevel)
   return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
-void Paddle::listen()
+bool Paddle::listen()
 {
   static char inBuffer[64];
   static uint8_t idx;
+  bool bChange = false;
 
   while(Serial.available())
   {
@@ -43,6 +44,8 @@ void Paddle::listen()
       if((p = strstr(inBuffer, "switch")) != NULL) // "switch":"on"
       {
         bool b = (p[10] == 'n') ? true:false; // on or off
+        if(m_bPower != b)
+          bChange = true;
         m_bPower = b;
       }
       if((p = strstr(inBuffer, "bright")) != NULL) // "bright":99
@@ -75,6 +78,7 @@ void Paddle::listen()
       setLED(0, !m_bLED[0]);
     }
   }
+  return bChange;
 }
 
 void Paddle::setSwitch(bool bOn)
