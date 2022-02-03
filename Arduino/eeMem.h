@@ -51,11 +51,13 @@ struct Device
 
 struct DevState
 {
-  bool bOn;
+  bool bPwr;
   uint8_t nLevel;
   uint32_t tm;
   bool bChanged;
   uint8_t cmd;
+  bool bPwrS;
+  uint8_t nLevelS;
 };
 
 struct Energy
