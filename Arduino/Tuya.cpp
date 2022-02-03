@@ -10,8 +10,8 @@
 //#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
 //#define MOES1  // https://www.amazon.com/MOES-Replaces-Multi-Control-Required-Compatible/dp/B08NJKSKRJ/ref=sr_1_12?m=AM2ATWLFGFUBV&qid=1639721132&s=merchant-items&sr=1-12
 //#define MOES2 // v1.1 uses main serial and 104-1000 for level
-#define MOES3 // EDM-1WAA-US KER_V1.0 Uses main serial, 115200 baud and 10-1000 for level
-//#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
+//#define MOES3 // EDM-1WAA-US KER_V1.0 Uses main serial, 115200 baud and 10-1000 for level
+#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
 //#define GLASS // Avatar maybe? https://www.sears.com/avatar-controls-smart-wifi-dimmer-switch-wall-light/p-A074841312
 
 #define BAUD 9600
@@ -19,25 +19,21 @@
 
 #if defined(GEENI) || defined (MOES3)
 #define BAUD 115200
-#endif
-#if defined(MOES1) || defined(MOES2)
+#elif defined(MOES1) || defined(MOES2)
 #define DIM_CMD 3
-#endif
-#if defined(WIRED) || defined(GLASS)
+#elif defined(WIRED) || defined(GLASS)
 #define WIFI_LED  14  // Green LED (on high) for the wired one
 #endif
 
 Tuya::Tuya()
 {
-#ifdef MOES2 // 16 bit level on new version
+#if defined (MOES2) // 16 bit level on new version
   nLevelMin = 104;
   nLevelMax = 1000;
-#endif
-#ifdef MOES3
+#elif defined(MOES3)
   nLevelMin = 10;
   nLevelMax = 1000;
-#endif
-#ifdef GLASS
+#elif defined (GLASS)
   nLevelMin = 2;
 #endif
 }
@@ -87,7 +83,7 @@ uint8_t Tuya::getPower(uint8_t nLevel)
   return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
-void Tuya::listen()
+bool Tuya::listen()
 {
   static uint8_t inBuffer[52];
   static uint8_t idx;
@@ -97,7 +93,8 @@ void Tuya::listen()
   static uint16_t len;
   uint8_t n;
   uint16_t lvl;
-
+  bool bChange = false;
+  
   while(Serial.available())
   {
     uint8_t c = Serial.read();
@@ -158,6 +155,7 @@ void Tuya::listen()
                 {
                   case 5: // 01 01 00 01 01 on
                     m_bPower = inBuffer[4];
+                    bChange = false;
                     break;
                   case 8: // 03 02 00 04 00 ?? lvlH lvlL
                     lvl = (inBuffer[6] << 8) | inBuffer[7];
@@ -202,6 +200,7 @@ void Tuya::listen()
       setLED(0, !m_bLED[0]);
     }
   }
+  return bChange;
 }
 
 void Tuya::setSwitch(bool bOn)
