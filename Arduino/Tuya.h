@@ -7,7 +7,7 @@ class Tuya
 {
 public:
   Tuya();
-  void listen(void);
+  bool listen(void);
   void init(uint8_t nUserRange);
   char *getDevice(void);
   void setSwitch(bool bOn);
