@@ -27,12 +27,13 @@ uint8_t Module::getPower(uint8_t nLevel)
   return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
-void Module::listen()
+bool Module::listen()
 {
   // handle 60Hz AC switch input (low pulse while pressed)
   static int cnt;
   static uint32_t tm;
   static int8_t nDirection;
+  bool bChange = false;
 
   if(digitalRead(SWITCH_IN) == LOW) // catches at around 20-400ms
   {
@@ -43,7 +44,10 @@ void Module::listen()
       if(nDirection == 0) // set direction
       {
         if(m_bPower == false)
+        {
           m_bPower = true;
+          bChange = true;
+        }
         if(m_nLightLevel < m_nUserRange)
             nDirection = 1; // up
         else
@@ -64,7 +68,10 @@ void Module::listen()
   else if((millis() - tm) > 500 && cnt) // >500ms = release
   {
     if(cnt <= 4) // short tap (~100ms)
+    {
       m_bPower = !m_bPower;
+      bChange = true;
+    }
     cnt = 0;
 //    nDirection = 0; // reset will be up next time
   }
@@ -77,6 +84,7 @@ void Module::listen()
     uint8_t level = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
     writeSerial( m_bPower ? level : 0);
   }
+  return bChange;
 }
 
 void Module::setSwitch(bool bOn)
