@@ -30,14 +30,16 @@ public:
   uint8_t getPower(uint8_t nLevel);
 
   bool   m_bPower;      // power state
-  bool   m_bLED[2];
-  int8_t m_nLightLevel = 0; // current level (0=switch)
-  float  m_fVolts = 0; // 0 = no monitor
-  float  m_fCurrent;
   float  m_fPower;
+  float  m_fVolts = 0; // 0 = no monitor
+  int8_t m_nLightLevel = 0; // current level (0=switch)
+  float  m_fCurrent;
+  bool   m_bOption;
+
+private:
+  bool   m_bLED[2];
   float  m_fCurrentArr[10];
   float  m_fPowerArr[10];
-  bool  m_bOption;
   uint8_t m_nBlink;
   const uint8_t nLevelMin = 0;
   const uint8_t nLevelMax = 0; // no dimmer
