@@ -50,7 +50,7 @@ bool Switch::listen()
 
 #define REPEAT_DELAY 300 // increase for slower repeat
 
-  bool bRet = false;
+  bool bChange = false;
 
   bNewState = digitalRead(TOUCH_IN);
   if(bNewState != lbState)
@@ -103,6 +103,7 @@ bool Switch::listen()
   if(bInvoke)
   {
     m_bPower = !m_bPower;
+    bChange = true;
     setSwitch( m_bPower ); // toggle
   }
   lbState = bNewState;
@@ -190,7 +191,6 @@ bool Switch::listen()
                 nIdx = 0;
             }
           }
-          bRet = true;
           state = 0;
           idx = 0;
         }
@@ -202,7 +202,6 @@ bool Switch::listen()
     m_fPower = 0;
     m_fCurrent = 0;
     nArr = 0;
-    bRet = false;
   }
 #endif
 
@@ -216,7 +215,7 @@ bool Switch::listen()
     }
   }
 
-  return bRet;
+  return bChange;
 }
 
 void Switch::setSwitch(bool bOn)
