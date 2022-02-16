@@ -38,8 +38,7 @@ public:
     WiFiManager(){};
     void autoConnect(char const *apName, const char *pPass);
     void startAP(void);
-    bool connectNew(void);
-    void service(void);
+    int service(void);
     void setPass(const char *p);
     int state(void);
     String page(void);
