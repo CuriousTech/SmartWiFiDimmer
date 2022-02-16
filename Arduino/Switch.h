@@ -38,8 +38,9 @@ public:
 
 private:
   bool   m_bLED[2];
-  float  m_fCurrentArr[10];
-  float  m_fPowerArr[10];
+#define ARR_CNT 20
+  float  m_fCurrentArr[ARR_CNT];
+  float  m_fPowerArr[ARR_CNT];
   uint8_t m_nBlink;
   const uint8_t nLevelMin = 0;
   const uint8_t nLevelMax = 0; // no dimmer
