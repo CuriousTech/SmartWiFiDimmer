@@ -115,7 +115,6 @@ bool Switch::listen()
   static uint8_t inBuffer[24];
   static uint8_t idx;
   static uint8_t state;
-  static uint8_t nCnt;
   static uint8_t nArr;
   static uint16_t lastCF;
   static uint32_t timeout;
@@ -144,7 +143,7 @@ bool Switch::listen()
 
           uint8_t chk = 0;
           int i;
-          for(i = 0; i < 21; i++)
+          for(i = 0; i < 21; i++) // checksum
             chk += inBuffer[i];
           if(chk == inBuffer[i])
           {
@@ -166,20 +165,27 @@ bool Switch::listen()
             {
               lastCF = wCF;
               nIdx = 0;
-              nCnt = 0;
             }
 
             if( Adj & 0x20 )
             {
-              if(nIdx < 10)
+              if(nIdx < ARR_CNT)
               {
                 m_fCurrentArr[nIdx] = (float)dwCurrentCoef / (float)dwCurrentCycle;
                 m_fPowerArr[nIdx] =  (float)dwPowerCoef / (float)dwPowerCycle;
               }
 
+              if(m_fCurrentArr[nIdx] > 14.5) // 15A limit for S31
+              {
+                m_bPower = false;
+                bChange = true;
+                setSwitch( m_bPower );
+                WsSend("alert;Current Too High");
+              }
+
               float fCurr, fPow;
 
-              if(nArr < 10) nArr++; // valid entries in array
+              if(nArr < ARR_CNT) nArr++; // valid entries in array
               for(int i = 0; i < nArr; i++) // average
               {
                 fCurr += m_fCurrentArr[i];
@@ -187,7 +193,7 @@ bool Switch::listen()
               }
               m_fCurrent = fCurr / nArr;
               m_fPower = fPow / nArr;
-              if(++nIdx >= 10)// wrap at 10 samples even if no new CF
+              if(++nIdx >= ARR_CNT)// wrap at ARR_CNT samples even if no new CF
                 nIdx = 0;
             }
           }
