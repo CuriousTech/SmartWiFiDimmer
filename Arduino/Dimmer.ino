@@ -61,7 +61,7 @@ int serverPort = 80;  // listen port
 IPAddress lastIP;     // last IP that accessed the device
 int nWrongPass;       // wrong password block counter
 
-eeMem eemem;
+eeMem ee;
 UdpTime utime;
 uint16_t nSecTimer; // off timer
 uint32_t onCounter; // usage timer
@@ -424,22 +424,21 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 11: // TZ
           ee.tz = iValue;
-          if (ee.ntpServer[0]) utime.start();
+          if (ee.bUseNtp)
+            utime.start();
           break;
         case 12: // NTP
-          if (psValue)
-            strncpy(ee.ntpServer, psValue, sizeof(ee.ntpServer) );
-          utime.start();
+          ee.bUseNtp = iValue ? true:false;
+          if(ee.bUseNtp)
+            utime.start();
           break;
-        case 13: // NTPP
-          ee.udpPort = iValue;
-          if (ee.ntpServer[0]) utime.start();
+        case 13:
           break;
         case 14: // MOT
           ee.nMotionSecs = iValue;
           break;
         case 15: // reset
-          eemem.update();
+          ee.update();
           ESP.reset();
           break;
         case 16: // ch
@@ -502,7 +501,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           if (!strlen(psValue))
             break;
           strncpy(ee.szName, psValue, sizeof(ee.szName));
-          eemem.update();
+          ee.update();
           ESP.reset();
           break;
         case 33: // motpin
@@ -531,7 +530,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 39: // clear device list
           memset(&ee.dev, 0, sizeof(ee.dev));
-          eemem.update();
+          ee.update();
           break;
         case 40: // src : name of querying device
           src = psValue;
@@ -936,7 +935,6 @@ void MDNSscan()
 
 void setup()
 {
-  eemem.init();
   cont.init(200);
   wifi.autoConnect(ee.szName, ee.szControlPassword); // Tries config AP, then starts softAP mode for config
 
@@ -1011,7 +1009,7 @@ void setup()
     cont.setLED(0, false); // set it all to off
     cont.setLED(1, false);
     cont.setSwitch(false);
-    eemem.update();
+    ee.update();
   });
 #endif
   cont.setLevel(ee.nLightLevel);
@@ -1037,7 +1035,7 @@ void changeLEDs(bool bOn)
       cont.setLED(0, bOn); // link
       break;
     case 3:
-      cont.setLED(0, bOn ? false : true); // reverse
+      cont.setLED(0, !bOn); // reverse
       break;
   }
   switch (ee.flags1.led2)
@@ -1052,7 +1050,7 @@ void changeLEDs(bool bOn)
       cont.setLED(1, bOn); // link
       break;
     case 3:
-      cont.setLED(1, bOn ? false : true); // reverse
+      cont.setLED(1, !bOn); // reverse
       break;
   }
 }
@@ -1081,11 +1079,10 @@ void loop()
 
   if (wifi.state() == ws_connected)
     utime.check(ee.tz);
-  wifi.service();
-  if (wifi.connectNew())
+  if (wifi.service() == ws_connectSuccess)
   {
     MDNS.begin( ee.szName );
-    if (ee.ntpServer[0])
+    if (ee.bUseNtp)
       utime.start();
     MDNS.addService("esp", "tcp", serverPort);
     changeLEDs(cont.m_bPower);
@@ -1109,7 +1106,7 @@ void loop()
 
   if (cont.m_bPower != bOldOn)
   {
-    changeLEDs(bOldOn);
+    changeLEDs(cont.m_bPower);
     CallHost(Reason_Switch);
     sendState();
     if (bChange && cont.m_bPower)
@@ -1206,11 +1203,11 @@ void loop()
         last_day = day() - 1;
         if ( (hour_save = hr) == 2)
         {
-          if (ee.ntpServer[0]) utime.start();
+          if (ee.bUseNtp) utime.start();
         }
         eHours[hour_save].sec = 0;
         eHours[hour_save].fwh = 0;
-        eemem.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
+        ee.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
       }
 
       static uint8_t setupCnt = 2;
