@@ -76,47 +76,50 @@ struct flags_t
   uint16_t res:8;
 };
 
-struct eeSet // EEPROM backed data
-{
-  uint16_t size;          // if size changes, use defaults
-  uint16_t sum;           // if sum is diiferent from memory struct, write
-  char     szSSID[32];
-  char     szSSIDPassword[64];
-  char     ntpServer[32]; // ntp server URL
-  uint16_t udpPort;       // udp port
-  int8_t   tz;
-  flags_t  flags1;
-  char     szControlPassword[32];
-  uint8_t  hostIP[4];
-  uint16_t hostPort;
-  char     szName[28];
-  uint32_t autoTimer;
-  uint16_t nMotionSecs;
-  uint16_t watts;
-  uint16_t ppkw;
-  uint8_t  nLightLevel;
-  float    fTotalWatts;
-  uint32_t nTotalSeconds;
-  uint32_t nTotalStart;
-  uint8_t motionPin[2];
-  Sched    schedule[MAX_SCHED];  // 50*28
-  Device   dev[MAX_DEV];
-  Energy days[31]; // 248 the esp-07 EEPROM seems to be smaller than ESP-12?
-  Energy months[12]; // 96
-}; // 2272 + Energy = 2653
-
-extern eeSet ee;
+#define EESIZE (offsetof(eeMem, end) - offsetof(eeMem, size) )
 
 class eeMem
 {
 public:
-  eeMem(){};
-  void init(void);
+  eeMem();
   void update(void);
 private:
   uint16_t Fletcher16( uint8_t* data, int count);
-};
+public:
+  uint16_t size = EESIZE;          // if size changes, use defaults
+  uint16_t sum = 0xAAAA;           // if sum is diiferent from memory struct, write
+  char     szSSID[32] = ""; // Enter your SSID here
+  char     szSSIDPassword[64] = ""; // and SSID password
+  char     reserved[32];          // was ntp server
+  bool     bUseNtp;
+  bool     bNotUsed;
+  int8_t   tz = -5;
+  flags_t  flags1 = {0};
+  char     szControlPassword[32] = "password"; // password for WebSocket and HTTP params
+  uint8_t  hostIP[4] = {192,168,31,100}; // Control/status hub
+  uint16_t hostPort = 80;
+  char     szName[28] = "Switch4"; // Device/OTA name
+  uint32_t autoTimer;
+  uint16_t nMotionSecs;
+  uint16_t watts = 23;  // Fixed watts of device
+  uint16_t ppkw = 143;  // 14.3 cents/KWH
+  uint8_t  nLightLevel = 100; // 50%
+  float    fTotalWatts;
+  uint32_t nTotalSeconds;
+  uint32_t nTotalStart;
+  uint8_t  motionPin[2];   // motionPin  Basement=14, Back switch=14
+  Sched    schedule[MAX_SCHED] =  // 30*28
+  {
+    {  6*60,  10*60, 254, 100, "Morning"},  // time, seconds, wday, level, name
+    { 12*60,  60*60, 254, 60, "Lunch"},
+    { 14*60, 120*60, 254, 20, "Something"},
+  };
+  Device   dev[MAX_DEV];
+  Energy days[31]; // 248 the esp-07 EEPROM seems to be smaller than ESP-12?
+  Energy months[12]; // 96
+  uint8_t end; // marker for EEPROM data size and end
+}; // 2272 + Energy = 2653
 
-extern eeMem eemem;
+extern eeMem ee;
 
 #endif // EEMEM_H
