@@ -21,6 +21,7 @@ void Switch::init(uint8_t nUserRange)
   pinMode(RELAY, OUTPUT);
 #ifdef S31
   Serial.begin(4800, SERIAL_8E1);
+  ee.watts = 0; // 0W when off
 #endif
 }
 
@@ -147,25 +148,29 @@ bool Switch::listen()
             chk += inBuffer[i];
           if(chk == inBuffer[i])
           {
-            uint32_t dwVoltCoef = inBuffer[0] << 16 | inBuffer[1] << 8 | inBuffer[2];
+            static uint32_t dwVoltCoef;
+            static uint32_t dwCurrentCoef;
+            static uint32_t dwPowerCoef;
+
             uint32_t dwVoltCycle = inBuffer[3] << 16 | inBuffer[4] << 8 | inBuffer[5];
-            uint32_t dwCurrentCoef = inBuffer[6] << 16 | inBuffer[7] << 8 | inBuffer[8];
             uint32_t dwCurrentCycle = inBuffer[9] << 16 | inBuffer[10] << 8 | inBuffer[11];
-            uint32_t dwPowerCoef = inBuffer[12] << 16 | inBuffer[13] << 8 | inBuffer[14];
             uint32_t dwPowerCycle = inBuffer[15] << 16 | inBuffer[16] << 8 | inBuffer[17];
             uint8_t Adj = inBuffer[18];
             uint16_t wCF = inBuffer[19] << 8 | inBuffer[20];
-
-            if(Adj & 0x40)
-               m_fVolts =  (float)dwVoltCoef / (float)dwVoltCycle;
-
+ 
             static uint8_t nIdx;
 
             if(wCF != lastCF) // Usually every 10 (10Hz), but not always
             {
               lastCF = wCF;
               nIdx = 0;
+              dwVoltCoef = inBuffer[0] << 16 | inBuffer[1] << 8 | inBuffer[2];
+              dwCurrentCoef = inBuffer[6] << 16 | inBuffer[7] << 8 | inBuffer[8];
+              dwPowerCoef = inBuffer[12] << 16 | inBuffer[13] << 8 | inBuffer[14];
             }
+
+           if(Adj & 0x40)
+               m_fVolts =  (float)dwVoltCoef / (float)dwVoltCycle;
 
             if( Adj & 0x20 )
             {
