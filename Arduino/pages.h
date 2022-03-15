@@ -6,18 +6,12 @@ const char page1[] PROGMEM = R"rawliteral(
 <title>WiFi Dimmer</title>
 <style>
 div,table{border-radius: 3px;box-shadow: 2px 2px 12px #000000;
-background-image: -moz-linear-gradient(top, #ffffff, #405050);
-background-image: -ms-linear-gradient(top, #ffffff, #405050);
-background-image: -o-linear-gradient(top, #ffffff, #405050);
-background-image: -webkit-linear-gradient(top, #ffffff, #405050);
-background-image: linear-gradient(top, #ffffff, #405050);
+background: rgb(94,94,94);
+background: linear-gradient(0deg, rgba(94,94,94,1) 0%, rgba(160,160,160,1) 100%);
 background-clip: padding-box;}
 input{border-radius: 5px;box-shadow: 2px 2px 12px #000000;
-background-image: -moz-linear-gradient(top, #ffffff, #207080);
-background-image: -ms-linear-gradient(top, #ffffff, #207080);
-background-image: -o-linear-gradient(top, #ffffff, #207080);
-background-image: -webkit-linear-gradient(top, #a0c0ff, #207080);
-background-image: linear-gradient(top, #ffffff, #207080);
+background: rgb(160,160,160);
+background: linear-gradient(0deg, rgba(160,160,160,1) 0%, rgba(239,239,239,1) 100%);
 background-clip: padding-box;}
 body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
 </style>
@@ -59,7 +53,7 @@ console.log(evt.data)
   a.LED2.setAttribute('style',d.l2?'color:blue':'')
   a.LVL.value=d.lvl
   a.level.value=d.lvl
-  a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since '+(new Date(d.st*1000)).toLocaleString()
+  a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()
   if(d.lvl==0)
   {
    a.LVL.style.visibility='hidden'
@@ -497,8 +491,12 @@ try {
   ctx.stroke()
   ctx.textAlign="right"
   cp=date.getMinutes()*60+date.getSeconds()
-  if(wArr.length >= cp)
+  if(wArr.length>=cp)
+  {
+    if(cp&&wArr[cp-1]==0)
+      wArr[cp-1]=wt
     wArr[cp]=wt
+  }
   ctx.strokeStyle="#EEE"
   ctx.lineWidth=0.4
   ctx.beginPath()
