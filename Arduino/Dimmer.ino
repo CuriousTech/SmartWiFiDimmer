@@ -42,14 +42,14 @@
 #include <JsonClient.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonClient
 #include "jsonstring.h"
 
-//#include "Tuya.h"
-//Tuya cont;
+#include "Tuya.h" // Different models in Tuya.cpp
+Tuya cont;
+
+//#include "Switch.h"  // #define S31 is in Switch.h
+//Switch cont;
 
 //#include "Module.h"
 //Module cont;
-
-#include "Switch.h"
-Switch cont;
 
 //#include "Paddle.h"
 //Paddle cont;
@@ -107,15 +107,15 @@ void totalUpWatts(uint8_t nLevel)
   if (onCounter == 0 || year() < 2020)
     return;
   float w;
-  if (cont.m_fPower) // real power monitor
+  if (cont.m_fVolts) // real power monitor
     w = cont.m_fPower;
   else
     w = (float)ee.watts * cont.getPower(nLevel) / 100;
-  ee.fTotalWatts += (float)onCounter * w  / 3600; // add current cycle
+  ee.fTotalWatts += (float)onCounter * w / 3600; // add current cycle
   ee.nTotalSeconds += onCounter;
   uint8_t hr = hour();
   eHours[hr].sec += nDaySec;
-  eHours[hr].fwh += (float)nDaySec * w  / 3600;
+  eHours[hr].fwh += (float)nDaySec * w / 3600;
   if (year() > 2019) // Ensure date is valid
   {
     ee.days[day() - 1].sec = 0; // total the day from current hours
@@ -276,6 +276,8 @@ const char *jsonListCmd[] = { "cmd",
   "clear",
   "src", // 40
   "state",
+  "contip",
+  "contport",
   NULL
 };
 
@@ -397,7 +399,8 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
             nSecTimer = ee.autoTimer;
           break;
         case 4: // tmr
-          nSecTimer = iValue;
+          if(cont.m_bPower)
+            nSecTimer = iValue;
           break;
         case 5: // delay to on
           nDelayOn = iValue;
@@ -539,6 +542,21 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           if (src.length())
             setDevState(src, iValue ? true : false);
           break;
+        case 42: // contip
+          {
+            IPAddress IP;
+            IP.fromString(psValue);
+            ee.controlPort = 80;
+            ee.controlIP[0] = IP[0];
+            ee.controlIP[1] = IP[1];
+            ee.controlIP[2] = IP[2];
+            ee.controlIP[3] = IP[3];
+            CallHost(Reason_Setup); // test
+          }
+          break;
+        case 43: // contport
+          ee.controlPort = iValue;
+          break;
         default:
           break;
       }
@@ -602,11 +620,14 @@ void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           }
           break;
         case 1: // time
-          if (iValue < now() + ((ee.tz + utime.getDST()) * 3600) )
-            break;
-          setTime(iValue + (ee.tz * 3600));
-          utime.DST();
-          setTime(iValue + ((ee.tz + utime.getDST()) * 3600));
+          if (!ee.bUseNtp)
+          {
+            if (iValue < now() + ((ee.tz + utime.getDST()) * 3600) )
+              break;
+            setTime(iValue + (ee.tz * 3600));
+            utime.DST();
+            setTime(iValue + ((ee.tz + utime.getDST()) * 3600));
+          }
           if (nDev < 0) break;
           devst[nDev].tm = iValue;
           break;
@@ -652,24 +673,18 @@ void checkQueue()
     if(queue[idx].port)
       break;
   }
-  if(idx == CQ_CNT) // nothing to do
+  if(idx == CQ_CNT || queue[idx].port == 0) // nothing to do
     return;
 
-  if (jsonPush0.status() == JC_IDLE)
+  if ( jsonPush0.begin(queue[idx].ip, queue[idx].sUri.c_str(), queue[idx].port, false, false, NULL, NULL, 1) )
   {
-    if ( jsonPush0.begin(queue[idx].ip, queue[idx].sUri.c_str(), queue[idx].port, false, false, NULL, NULL, 500) )
-    {
-      jsonPush0.addList(jsonListPush);
-      queue[idx].port = 0;
-    }
+    jsonPush0.addList(jsonListPush);
+    queue[idx].port = 0;
   }
-  else if (jsonPush1.status() == JC_IDLE) // Using alternating requests now for faster response
+  else if ( jsonPush1.begin(queue[idx].ip, queue[idx].sUri.c_str(), queue[idx].port, false, false, NULL, NULL, 1) )
   {
-    if ( jsonPush1.begin(queue[idx].ip, queue[idx].sUri.c_str(), queue[idx].port, false, false, NULL, NULL, 500) )
-    {
-      jsonPush1.addList(jsonListPush);
-      queue[idx].port = 0;
-    }
+    jsonPush1.addList(jsonListPush);
+    queue[idx].port = 0;
   }
 }
 
@@ -726,6 +741,12 @@ void CallHost(reportReason r)
 
   IPAddress ip(ee.hostIP);
   callQueue(ip, sUri, ee.hostPort);
+
+  if(ee.controlIP[3])
+  {
+    IPAddress ip2(ee.controlIP);
+    callQueue(ip2, sUri, ee.controlPort);
+  }
 }
 
 #define DC_LNK 1
@@ -756,6 +777,8 @@ void manageDevs(int dt)
         {
           if (cont.m_bPower)
           {
+            if(devst[i].bPwrS == cont.m_bPower) // save a send
+              continue;
             sUri += "pwr=";
             sUri += cont.m_bPower;
           }
@@ -767,6 +790,8 @@ void manageDevs(int dt)
         }
         else // on/off link
         {
+          if(devst[i].bPwrS == cont.m_bPower) // save a send
+            continue;
           sUri += "pwr=";
           sUri += cont.m_bPower;
         }
@@ -782,6 +807,8 @@ void manageDevs(int dt)
           }
           else // instant off
           {
+            if(devst[i].bPwrS == false) // save a send
+              continue;
             sUri += "pwr=0";
           }
         }
@@ -794,10 +821,6 @@ void manageDevs(int dt)
       sUri += cont.m_bPower;
       devst[i].bPwrS = cont.m_bPower;
       callQueue(ip, sUri, 80);
-//      String s = "print;Link ";
-//      s += ip.toString();
-//      s += sUri;
-//      WsSend(s);
     }
     if ((dt & DC_DIM) && (ee.dev[i].flags & DF_DIM) ) // link dimmer level
     {
@@ -870,10 +893,10 @@ void checkDevChanges() // realtime update of device changes
       sUri += "&src=";
       sUri += ee.szName;
       sUri += "&pwr=";
-      sUri += devst[i].cmd - 1;
+      sUri += devst[i].cmd - 1; // 1=off, 2=on
       sUri += "&state=";
       sUri += cont.m_bPower;
-      devst[i].bPwrS = cont.m_bPower;
+      devst[i].bPwrS = (devst[i].cmd - 1);
       IPAddress ip(ee.dev[i].IP);
       callQueue(ip, sUri, 80);
       devst[i].cmd = 0;
@@ -971,10 +994,14 @@ void setup()
     parseParams(request);
     jsonString js;
     js.Var("name", ee.szName );
-    if (year() > 2020)
-      js.Var("time", (long)now() - ( (ee.tz + utime.getDST() ) * 3600) );
-    js.Var("ppkw", ee.ppkw );
-    js.Var("tz", ee.tz );
+    if (ee.bUseNtp)
+    {
+      if (year() > 2020)
+        js.Var("time", (long)now() - ( (ee.tz + utime.getDST() ) * 3600) );
+    }
+//    js.Var("ppkw", ee.ppkw );
+//    js.Var("tz", ee.tz );
+
     js.Var("on", cont.m_bPower );
     js.Var("level", cont.m_nLightLevel );
     request->send(200, "text/plain", js.Close());
