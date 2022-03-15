@@ -90,7 +90,9 @@ public:
   uint16_t sum = 0xAAAA;           // if sum is diiferent from memory struct, write
   char     szSSID[32] = ""; // Enter your SSID here
   char     szSSIDPassword[64] = ""; // and SSID password
-  char     reserved[32];          // was ntp server
+  uint8_t  controlIP[4] = {192,168,31,191};
+  uint16_t controlPort = 80;
+  char     reserved[26];
   bool     bUseNtp;
   bool     bNotUsed;
   int8_t   tz = -5;
@@ -98,7 +100,7 @@ public:
   char     szControlPassword[32] = "password"; // password for WebSocket and HTTP params
   uint8_t  hostIP[4] = {192,168,31,100}; // Control/status hub
   uint16_t hostPort = 80;
-  char     szName[28] = "Switch4"; // Device/OTA name
+  char     szName[28] = "Garage"; // Device/OTA name
   uint32_t autoTimer;
   uint16_t nMotionSecs;
   uint16_t watts = 23;  // Fixed watts of device
