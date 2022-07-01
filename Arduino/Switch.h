@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 // Uncomment for S31 current sensor model
-//#define S31
+#define S31
 
 #ifdef S31
 #define TOUCH_IN  0  // side button
@@ -31,16 +31,14 @@ public:
 
   bool   m_bPower;      // power state
   float  m_fPower;
+  float  m_fCurrent;
   float  m_fVolts = 0; // 0 = no monitor
   int8_t m_nLightLevel = 0; // current level (0=switch)
-  float  m_fCurrent;
   bool   m_bOption;
 
 private:
+
   bool   m_bLED[2];
-#define ARR_CNT 20
-  float  m_fCurrentArr[ARR_CNT];
-  float  m_fPowerArr[ARR_CNT];
   uint8_t m_nBlink;
   const uint8_t nLevelMin = 0;
   const uint8_t nLevelMax = 0; // no dimmer
