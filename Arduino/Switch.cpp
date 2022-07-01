@@ -157,49 +157,31 @@ bool Switch::listen()
             uint32_t dwPowerCycle = inBuffer[15] << 16 | inBuffer[16] << 8 | inBuffer[17];
             uint8_t Adj = inBuffer[18];
             uint16_t wCF = inBuffer[19] << 8 | inBuffer[20];
- 
-            static uint8_t nIdx;
 
             if(wCF != lastCF) // Usually every 10 (10Hz), but not always
             {
               lastCF = wCF;
-              nIdx = 0;
               dwVoltCoef = inBuffer[0] << 16 | inBuffer[1] << 8 | inBuffer[2];
               dwCurrentCoef = inBuffer[6] << 16 | inBuffer[7] << 8 | inBuffer[8];
               dwPowerCoef = inBuffer[12] << 16 | inBuffer[13] << 8 | inBuffer[14];
             }
 
-           if(Adj & 0x40)
+            if(Adj & 0x40)
                m_fVolts =  (float)dwVoltCoef / (float)dwVoltCycle;
+            if(Adj & 0x10)
+              m_fPower =  (float)dwPowerCoef / (float)dwPowerCycle;
 
             if( Adj & 0x20 )
             {
-              if(nIdx < ARR_CNT)
-              {
-                m_fCurrentArr[nIdx] = (float)dwCurrentCoef / (float)dwCurrentCycle;
-                m_fPowerArr[nIdx] =  (float)dwPowerCoef / (float)dwPowerCycle;
-              }
+              m_fCurrent = (float)dwCurrentCoef / (float)dwCurrentCycle;
 
-              if(m_fCurrentArr[nIdx] > 14.5) // 15A limit for S31
+              if(m_fCurrent > 14.5) // 15A limit for S31
               {
                 m_bPower = false;
                 bChange = true;
                 setSwitch( m_bPower );
                 WsSend("alert;Current Too High");
               }
-
-              float fCurr, fPow;
-
-              if(nArr < ARR_CNT) nArr++; // valid entries in array
-              for(int i = 0; i < nArr; i++) // average
-              {
-                fCurr += m_fCurrentArr[i];
-                fPow += m_fPowerArr[i];
-              }
-              m_fCurrent = fCurr / nArr;
-              m_fPower = fPow / nArr;
-              if(++nIdx >= ARR_CNT)// wrap at ARR_CNT samples even if no new CF
-                nIdx = 0;
             }
           }
           state = 0;
