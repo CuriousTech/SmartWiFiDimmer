@@ -7,22 +7,26 @@
 
 // Only uncomment one
 
-//#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
+#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
 //#define MOES1  // https://www.amazon.com/MOES-Replaces-Multi-Control-Required-Compatible/dp/B08NJKSKRJ/ref=sr_1_12?m=AM2ATWLFGFUBV&qid=1639721132&s=merchant-items&sr=1-12
 //#define MOES2 // v1.1 uses main serial and 104-1000 for level
 //#define MOES3 // EDM-1WAA-US KER_V1.0 Uses main serial, 115200 baud and 10-1000 for level
-#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
+//#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
 //#define GLASS // Avatar maybe? https://www.sears.com/avatar-controls-smart-wifi-dimmer-switch-wall-light/p-A074841312
-
-#define BAUD 9600
-#define DIM_CMD 2 // 2 for Geeni, glass, wired, and MOES3
 
 #if defined(GEENI) || defined (MOES3)
 #define BAUD 115200
+#define DIM_CMD 2 // 2 for Geeni, glass, wired, and MOES3
 #elif defined(MOES1) || defined(MOES2)
+#define BAUD 9600
 #define DIM_CMD 3
 #elif defined(WIRED) || defined(GLASS)
+#define BAUD 9600
+#define DIM_CMD 2 // 2 for Geeni, glass, wired, and MOES3
 #define WIFI_LED  14  // Green LED (on high) for the wired one
+#else
+#define BAUD 9600
+#define DIM_CMD 2 // 2 for Geeni, glass, wired, and MOES3
 #endif
 
 Tuya::Tuya()
@@ -53,7 +57,7 @@ void Tuya::init(uint8_t nUserRange)
   checkStatus();
 }
 
-char *Tuya::getDevice()
+const char *Tuya::getDevice()
 {
 #if defined(MOES1)
   return "MOES1";
