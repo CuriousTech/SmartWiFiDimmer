@@ -17,7 +17,7 @@ void Module::init(uint8_t nUserRange)
   Serial.begin(9600);
 }
 
-char *Module::getDevice()
+const char *Module::getDevice()
 {
   return "DIMMER_CUBE";
 }
