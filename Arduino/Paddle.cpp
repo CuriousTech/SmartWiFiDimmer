@@ -16,7 +16,7 @@ void Paddle::init(uint8_t nRange)
   Serial.begin(19200);
 }
 
-char *Paddle::getDevice()
+const char *Paddle::getDevice()
 {
   return "PADDLE";
 }
