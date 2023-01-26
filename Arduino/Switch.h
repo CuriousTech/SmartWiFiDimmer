@@ -25,7 +25,7 @@ public:
   void init(uint8_t nUserRange);
   void setSwitch(bool bOn);
   void setLevel(uint8_t level);
-  char *getDevice(void);
+  const char *getDevice(void);
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
 
