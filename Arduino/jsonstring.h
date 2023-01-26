@@ -17,7 +17,7 @@ public:
     return s;
   }
 
-  void Var(char *key, int iVal)
+  void Var(const char *key, int iVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -27,7 +27,7 @@ public:
     m_cnt++;
   }
 
-  void Var(char *key, uint32_t iVal)
+  void Var(const char *key, uint32_t iVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -37,7 +37,7 @@ public:
     m_cnt++;
   }
 
-  void Var(char *key, long int iVal)
+  void Var(const char *key, long int iVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -47,7 +47,7 @@ public:
     m_cnt++;
   }
 
-  void Var(char *key, float fVal)
+  void Var(const char *key, float fVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -57,7 +57,7 @@ public:
     m_cnt++;
   }
   
-  void Var(char *key, bool bVal)
+  void Var(const char *key, bool bVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -67,7 +67,7 @@ public:
     m_cnt++;
   }
   
-  void Var(char *key, char *sVal)
+  void Var(const char *key, const char *sVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -78,7 +78,7 @@ public:
     m_cnt++;
   }
   
-  void Var(char *key, String sVal)
+  void Var(const char *key, String sVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -89,7 +89,7 @@ public:
     m_cnt++;
   }
 
-  void Array(char *key, String sVal[], int n)
+  void Array(const char *key, String sVal[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -106,7 +106,7 @@ public:
     m_cnt++;
   }
 
-  void Array(char *key, uint16_t iVal[], int n)
+  void Array(const char *key, uint16_t iVal[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -121,7 +121,7 @@ public:
     m_cnt++;
   }
 
-  void Array(char *key, uint32_t iVal[], int n)
+  void Array(const char *key, uint32_t iVal[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -136,7 +136,7 @@ public:
     m_cnt++;
   }
 
-  void Array(char *key, float fVal[], int n)
+  void Array(const char *key, float fVal[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -154,7 +154,7 @@ public:
     m_cnt++;
   }
 
-  int RLE(char *key, float fVal[], int n, int nTotal)
+  int RLE(const char *key, float fVal[], int n, int nTotal)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -212,7 +212,7 @@ public:
     return n;
   }
 
-  void Array(char *key, Sched sch[], int n)
+  void Array(const char *key, Sched sch[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -235,7 +235,7 @@ public:
     m_cnt++;
   }
 
-  void Array(char *key, Device dev[], DevState devst[], int n)
+  void Array(const char *key, Device dev[], DevState devst[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -258,7 +258,7 @@ public:
     m_cnt++;
   }
 
-  void Array(char *key, Energy stuff[], int n)
+  void Array(const char *key, Energy stuff[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
