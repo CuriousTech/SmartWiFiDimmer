@@ -25,7 +25,7 @@ void Switch::init(uint8_t nUserRange)
 #endif
 }
 
-char *Switch::getDevice()
+const char *Switch::getDevice()
 {
 #ifdef S31
   return "S31";
