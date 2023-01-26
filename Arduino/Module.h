@@ -9,7 +9,7 @@ public:
   Module();
   bool listen(void);
   void init(uint8_t nUserRange);
-  char *getDevice(void);
+  const char *getDevice(void);
   void setSwitch(bool bOn);
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
