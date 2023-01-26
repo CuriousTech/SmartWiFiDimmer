@@ -28,7 +28,6 @@
 #include <Wire.h>
 #include <EEPROM.h>
 #include <ESP8266mDNS.h>
-#include "WiFiManager.h"
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
 #include "eeMem.h"
@@ -76,7 +75,6 @@ uint32_t nDayWh;
 uint32_t motionSuppress;
 Energy eHours[24];
 
-WiFiManager wifi;  // AP page:  192.168.4.1
 AsyncWebServer server( serverPort );
 AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 
@@ -85,6 +83,10 @@ JsonParse jsonParse(jsonCallback);
 void jsonPushCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
 JsonClient jsonPush0(jsonPushCallback);
 JsonClient jsonPush1(jsonPushCallback);
+
+bool bConfigDone = false;
+bool bStarted = false;
+uint32_t connectTimer;
 
 bool bKeyGood;
 
@@ -235,8 +237,6 @@ String histJson()
 
 const char *jsonListCmd[] = { "cmd",
   "key", // 0
-  "ssid",
-  "pass",
   "pwr",
   "tmr",
   "dlyon",
@@ -244,19 +244,18 @@ const char *jsonListCmd[] = { "cmd",
   "sch",
   "led1",
   "led2",
-  "level", // 10
+  "level",
   "TZ",
-  "NTP",
-  "NTPP",
+  "NTP", // 10
   "MOT",
   "reset",
   "ch",
   "ppkw",
   "watts",
   "rt",
-  "I", // 20
+  "I",
   "N",
-  "S",
+  "S", // 20
   "T",
   "W",
   "L",
@@ -383,13 +382,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
               bKeyGood = true;
           src = ""; // reset source ID
           break;
-        case 1: // wifi SSID from config page
-          strncpy((char *)&ee.szSSID, psValue, sizeof(ee.szSSID));
-          break;
-        case 2: // wifi password from config page
-          wifi.setPass(psValue);
-          break;
-        case 3: // pwr (was on)
+        case 1: // pwr (was on)
           nSecTimer = 0;
           if (iValue == 2) iValue = cont.m_bPower ^ 1; // toggle
           bOldOn = !iValue; // force report
@@ -398,125 +391,123 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           if (iValue && ee.autoTimer)
             nSecTimer = ee.autoTimer;
           break;
-        case 4: // tmr
+        case 2: // tmr
           if(cont.m_bPower)
             nSecTimer = iValue;
           break;
-        case 5: // delay to on
+        case 3: // delay to on
           nDelayOn = iValue;
           break;
-        case 6: // auto
+        case 4: // auto
           ee.autoTimer = iValue;
           break;
-        case 7: // sch
+        case 5: // sch
           // schedule a time
           break;
-        case 8: // led1
+        case 6: // led1
           cont.setLED(0, iValue ? true : false);
           ee.flags1.led1 = iValue;
           break;
-        case 9: // led2
+        case 7: // led2
           cont.setLED(1, iValue ? true : false);
           ee.flags1.led2 = iValue;
           break;
-        case 10: // level
+        case 8: // level
           if (nSched) bOverride = (iValue == 0);
           cont.setLevel( ee.nLightLevel = constrain(iValue, 1, 200) );
           if (iValue && ee.autoTimer)
             nSecTimer = ee.autoTimer;
           break;
-        case 11: // TZ
+        case 9: // TZ
           ee.tz = iValue;
           if (ee.bUseNtp)
             utime.start();
           break;
-        case 12: // NTP
+        case 10: // NTP
           ee.bUseNtp = iValue ? true:false;
           if(ee.bUseNtp)
             utime.start();
           break;
-        case 13:
-          break;
-        case 14: // MOT
+        case 11: // MOT
           ee.nMotionSecs = iValue;
           break;
-        case 15: // reset
+        case 12: // reset
           ee.update();
           ESP.reset();
           break;
-        case 16: // ch
+        case 13: // ch
           ee.flags1.call = iValue;
           if (iValue) CallHost(Reason_Setup); // test
           break;
-        case 17: // PPWH
+        case 14: // PPWH
           ee.ppkw = iValue;
           break;
-        case 18: // watts
+        case 15: // watts
           ee.watts = iValue;
           break;
-        case 19: // rt
+        case 16: // rt
           totalUpWatts(cont.m_nLightLevel);
           ee.fTotalWatts = 0;
           ee.nTotalSeconds = 0;
           ee.nTotalStart = now() - ( (ee.tz + utime.getDST() ) * 3600);
           break;
-        case 20: //I
+        case 17: //I
           n = constrain(iValue, 0, MAX_SCHED - 1);
           break;
-        case 21: // N
+        case 18: // N
           if (psValue)
             strncpy(ee.schedule[n].sname, psValue, sizeof(ee.schedule[0].sname) );
           break;
-        case 22: // S
+        case 19: // S
           ee.schedule[n].timeSch = iValue;
           break;
-        case 23: // T
+        case 20: // T
           ee.schedule[n].seconds = iValue;
           break;
-        case 24: // W
+        case 21: // W
           ee.schedule[n].wday = iValue;
           break;
-        case 25: // L
+        case 22: // L
           ee.schedule[n].level = iValue;
           break;
-        case 26: // DEV index of device to set
+        case 23: // DEV index of device to set
           dev = iValue;
           break;
-        case 27: // MODE disable, link, reverse
+        case 24: // MODE disable, link, reverse
           ee.dev[dev].mode = iValue;
           break;
-        case 28: // DIM // link dimming
+        case 25: // DIM // link dimming
           ee.dev[dev].flags &= ~1; // define this later
           ee.dev[dev].flags |= (iValue & 1);
           break;
-        case 29: // OP (flag 2) // motion to other switch
+        case 26: // OP (flag 2) // motion to other switch
           ee.dev[dev].flags &= ~2; // define this later
           ee.dev[dev].flags |= (iValue << 1);
           break;
-        case 30: // DLY // delay off (when this one turns on)
+        case 27: // DLY // delay off (when this one turns on)
           ee.dev[dev].delay = iValue;
           break;
-        case 31: // DON  device power (see checkDevChanges)
+        case 28: // DON  device power (see checkDevChanges)
           devst[dev].cmd = iValue + 1;
           devst[dev].bPwr = iValue ? true : false;
           break;
-        case 32: // devname (host name)
+        case 29: // devname (host name)
           if (!strlen(psValue))
             break;
           strncpy(ee.szName, psValue, sizeof(ee.szName));
           ee.update();
           ESP.reset();
           break;
-        case 33: // motpin
+        case 30: // motpin
           ee.motionPin[0] = iValue;
           break;
-        case 34: // motpin2
+        case 31: // motpin2
           ee.motionPin[1] = iValue;
           break;
-        case 35: // startmode
+        case 32: // startmode
           ee.flags1.start = iValue;
           break;
-        case 36: // hostip
+        case 33: // hostip
           ee.hostPort = 80;
           ee.hostIP[0] = lastIP[0];
           ee.hostIP[1] = lastIP[1];
@@ -525,24 +516,24 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           ee.flags1.call = 1;
           CallHost(Reason_Setup); // test
           break;
-        case 37: // host port
+        case 34: // host port
           ee.hostPort = iValue;
           break;
-        case 38:
+        case 35:
           motionSuppress = iValue;
           break;
-        case 39: // clear device list
+        case 36: // clear device list
           memset(&ee.dev, 0, sizeof(ee.dev));
           ee.update();
           break;
-        case 40: // src : name of querying device
+        case 37: // src : name of querying device
           src = psValue;
           break;
-        case 41: // state : also current state of querying device
+        case 38: // state : also current state of querying device
           if (src.length())
             setDevState(src, iValue ? true : false);
           break;
-        case 42: // contip
+        case 39: // contip
           {
             IPAddress IP;
             IP.fromString(psValue);
@@ -554,7 +545,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
             CallHost(Reason_Setup); // test
           }
           break;
-        case 43: // contport
+        case 40: // contport
           ee.controlPort = iValue;
           break;
         default:
@@ -664,7 +655,7 @@ cQ queue[CQ_CNT];
 
 void checkQueue()
 {
-  if(wifi.state() != ws_connected)
+  if(WiFi.status() != WL_CONNECTED)
     return;
 
   int idx;
@@ -777,8 +768,8 @@ void manageDevs(int dt)
         {
           if (cont.m_bPower)
           {
-            if(devst[i].bPwrS == cont.m_bPower) // save a send
-              continue;
+//            if(devst[i].bPwrS == cont.m_bPower) // save a send
+//              continue;
             sUri += "pwr=";
             sUri += cont.m_bPower;
           }
@@ -959,7 +950,22 @@ void MDNSscan()
 void setup()
 {
   cont.init(200);
-  wifi.autoConnect(ee.szName, ee.szControlPassword); // Tries config AP, then starts softAP mode for config
+
+  WiFi.hostname(ee.szName);
+  WiFi.mode(WIFI_STA);
+
+  if ( ee.szSSID[0] )
+  {
+    WiFi.begin(ee.szSSID, ee.szSSIDPassword);
+    WiFi.setHostname(ee.szName);
+    bConfigDone = true;
+  }
+  else
+  {
+    Serial.println("No SSID. Waiting for EspTouch.");
+    WiFi.beginSmartConfig();
+  }
+  connectTimer = now();
 
   // attach AsyncWebSocket
   ws.onEvent(onWsEvent);
@@ -967,13 +973,8 @@ void setup()
 
   server.on ( "/", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request)
   {
-    if (wifi.state() == ws_config)
-      request->send( 200, "text/html", wifi.page() ); // WIFI config page
-    else
-    {
-      parseParams(request);
-      request->send_P( 200, "text/html", page1);
-    }
+    parseParams(request);
+    request->send_P( 200, "text/html", page1);
   });
 
   server.on( "/s", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request)
@@ -1104,17 +1105,8 @@ void loop()
   ArduinoOTA.handle();
 #endif
 
-  if (wifi.state() == ws_connected)
+  if (WiFi.status() == WL_CONNECTED)
     utime.check(ee.tz);
-  if (wifi.service() == ws_connectSuccess)
-  {
-    MDNS.begin( ee.szName );
-    if (ee.bUseNtp)
-      utime.start();
-    MDNS.addService("esp", "tcp", serverPort);
-    changeLEDs(cont.m_bPower);
-    MDNSscan();
-  }
 
   bool bChange = cont.listen();
 
@@ -1192,17 +1184,60 @@ void loop()
   {
     sec_save = second();
 
-    if (wifi.state() == ws_config)
+    if(!bConfigDone)
     {
-      static bool bLED;
-      cont.setLED(0, bLED);
-      bLED = !bLED;
+      if( WiFi.smartConfigDone())
+      {
+        Serial.println("SmartConfig set");
+        bConfigDone = true;
+        connectTimer = now();
+      }
     }
-    else if (wifi.state() == ws_connecting)
+    if(bConfigDone)
+    {
+      if(WiFi.status() == WL_CONNECTED)
+      {
+        if(!bStarted)
+        {
+          Serial.println("WiFi Connected");
+          MDNS.begin( ee.szName );
+          bStarted = true;
+          if (ee.bUseNtp)
+            utime.start();
+          MDNS.addService("esp", "tcp", serverPort);
+          WiFi.SSID().toCharArray(ee.szSSID, sizeof(ee.szSSID)); // Get the SSID from SmartConfig or last used
+          WiFi.psk().toCharArray(ee.szSSIDPassword, sizeof(ee.szSSIDPassword) );
+          changeLEDs(cont.m_bPower);
+          MDNSscan();
+          ee.update();
+        }
+        if(utime.check(ee.tz))
+          checkSched(true);  // initialize
+      }
+      else if(now() - connectTimer > 10) // failed to connect for some reason
+      {
+        Serial.println("Connect failed. Starting SmartConfig");
+        connectTimer = now();
+        ee.szSSID[0] = 0;
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.beginSmartConfig();
+        bConfigDone = false;
+        bStarted = false;
+      }
+    }
+
+    int8_t st = WiFi.status();
+    if (st == WL_NO_SSID_AVAIL || st == WL_IDLE_STATUS || st == WL_DISCONNECTED || WL_CONNECTION_LOST )
     {
       cont.setLED(0, true);
       delay(20);
       cont.setLED(0, false);
+    }
+    else if (st != WL_CONNECTED)
+    {
+      static bool bLED;
+      cont.setLED(0, bLED);
+      bLED = !bLED;
     }
 
     if (cont.m_bOption)
