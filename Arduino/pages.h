@@ -38,11 +38,8 @@ ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
 console.log(evt.data)
- lines=evt.data.split(';')
- event=lines[0]
- data=lines[1]
- d=JSON.parse(data)
- if(event=='state'){
+ d=JSON.parse(evt.data)
+ if(d.cmd=='state'){
   d2=new Date(d.t*1000)
   a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
   a.RLY.value=nms[d.on]
@@ -63,7 +60,7 @@ console.log(evt.data)
   a.MOT.setAttribute('bgcolor',d.mo?'red':'')
   if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')
  }
- else if(event=='energy')
+ else if(d.cmd=='energy')
  {
   d2=new Date(d.t*1000)
   a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
@@ -75,18 +72,18 @@ console.log(evt.data)
   a.cost.value=((+d.wh)*(+a.ppkw.value/1000)).toFixed(3)
   draw_point(d.p)
  }
- else if(event=='setup')
+ else if(d.cmd=='setup')
  {
   fillData(d)
  }
- else if(event=='hist')
+ else if(d.cmd=='hist')
  {
    days=d.days
    hours=d.hours
    months=d.months
    drawstuff()
  }
- else if(event=="watts")
+ else if(d.cmd=="watts")
  {
    for(i=0;i<d.watts.length;i++)
    {
@@ -108,7 +105,7 @@ console.log(evt.data)
      }
    }
  }
- else if(event=='update')
+ else if(d.cmd=='update')
  {
   switch(d.type)
   {
@@ -123,16 +120,16 @@ console.log(evt.data)
   }
   update_bars()
  }
- else if(event=='dev')
+ else if(d.cmd=='dev')
  {
    updateDev(+d.dev,+d.on,+d.level)
  }
- else if(event=='alert'){alert(data)}
+ else if(d.cmd=='alert'){alert(d.text)}
 }
 }
 function setVar(varName, value)
 {
- ws.send('cmd;{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
+ ws.send('{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
 }
 function manual()
 {
