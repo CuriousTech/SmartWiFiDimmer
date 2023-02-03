@@ -180,7 +180,7 @@ bool Switch::listen()
                 m_bPower = false;
                 bChange = true;
                 setSwitch( m_bPower );
-                WsSend("alert;Current Too High");
+                WsSend("{\"cmd\":\"alert\",\"text\":\"Current Too High\"");
               }
             }
           }
