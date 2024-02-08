@@ -2,16 +2,16 @@
 
 #include "Tuya.h"
 #include <TimeLib.h>
-#include <UdpTime.h>
+//#include <UdpTime.h>
 #include "eeMem.h"
 
 // Only uncomment one
 
-#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
+//#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
 //#define MOES1  // https://www.amazon.com/MOES-Replaces-Multi-Control-Required-Compatible/dp/B08NJKSKRJ/ref=sr_1_12?m=AM2ATWLFGFUBV&qid=1639721132&s=merchant-items&sr=1-12
 //#define MOES2 // v1.1 uses main serial and 104-1000 for level
 //#define MOES3 // EDM-1WAA-US KER_V1.0 Uses main serial, 115200 baud and 10-1000 for level
-//#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
+#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
 //#define GLASS // Avatar maybe? https://www.sears.com/avatar-controls-smart-wifi-dimmer-switch-wall-light/p-A074841312
 
 #if defined(GEENI) || defined (MOES3)
@@ -158,7 +158,7 @@ bool Tuya::listen()
                 switch(len)
                 {
                   case 5: // 01 01 00 01 01 on
-                    m_bPower = inBuffer[4];
+                    m_bPower[0] = inBuffer[4];
                     bChange = false;
                     break;
                   case 8: // 03 02 00 04 00 ?? lvlH lvlL
@@ -207,7 +207,7 @@ bool Tuya::listen()
   return bChange;
 }
 
-void Tuya::setSwitch(bool bOn)
+void Tuya::setSwitch(uint8_t idx, bool bOn)
 {
   uint8_t data[5];// = {1,1,0,1,bOn};
   data[0] = 1;
