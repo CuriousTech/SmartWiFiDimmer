@@ -33,7 +33,7 @@ $(document).ready(function(){
 
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.31.57/ws")
+//ws=new WebSocket("ws://192.168.31.111/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -42,12 +42,21 @@ console.log(evt.data)
  if(d.cmd=='state'){
   d2=new Date(d.t*1000)
   a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
-  a.RLY.value=nms[d.on]
-  a.RLY.setAttribute('style',d.on?'color:red':'')
-  a.LED1.value=nms[d.l1]
-  a.LED1.setAttribute('style',d.l1?'color:blue':'')
-  a.LED2.value=nms[d.l2]
-  a.LED2.setAttribute('style',d.l2?'color:blue':'')
+  a.RLY.value=nms[d.on0]
+  a.RLY.setAttribute('style',d.on0?'color:red':'')
+  if(d.on1!=undefined)
+  {
+    a.RLY2.value=nms[d.on1]
+    a.RLY2.setAttribute('style',d.on1?'color:red':'')
+  }
+  else{
+    a.RLY2.style.visibility='hidden'
+    a.PF2.style.visibility='hidden'
+  }
+  a.LED1.value=nms[d.l0]
+  a.LED1.setAttribute('style',d.l0?'color:blue':'')
+  a.LED2.value=nms[d.l1]
+  a.LED2.setAttribute('style',d.l1?'color:blue':'')
   a.LVL.value=d.lvl
   a.level.value=d.lvl
   a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()
@@ -57,7 +66,7 @@ console.log(evt.data)
    a.level.style.visibility='hidden'
    a.header.innerHTML=' &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; '
   }
-  a.MOT.setAttribute('bgcolor',d.mo?'red':'')
+  a.MOT.setAttribute('bgcolor',d.mo0?'red':'')
   if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')
  }
  else if(d.cmd=='energy')
@@ -109,11 +118,11 @@ console.log(evt.data)
  {
   switch(d.type)
   {
-    case 'hour':
+   case 'hour':
     hours[d.e][0]=d.sec
     hours[d.e][1]=d.p
     break
-    case 'day':
+   case 'day':
     days[d.e][0]=d.sec
     days[d.e][1]=d.p
     break
@@ -122,7 +131,8 @@ console.log(evt.data)
  }
  else if(d.cmd=='dev')
  {
-   updateDev(+d.dev,+d.on,+d.level)
+   if(d.on1) updateDev(+d.dev,1,+d.on1,+d.level)
+   else updateDev(+d.dev,0,+d.on0,+d.level)
  }
  else if(d.cmd=='alert'){alert(d.text)}
 }
@@ -134,9 +144,16 @@ function setVar(varName, value)
 function manual()
 {
 on=(a.RLY.value=='OFF')
-setVar('pwr',on)
+setVar('pwr0',on)
 a.RLY.value=on?'ON ':'OFF'
 a.RLY.setAttribute('style',on?'color:red':'')
+}
+function manual2()
+{
+on=(a.RLY2.value=='OFF')
+setVar('pwr1',on)
+a.RLY2.value=on?'ON ':'OFF'
+a.RLY2.setAttribute('style',on?'color:red':'')
 }
 
 function pf()
@@ -144,9 +161,19 @@ function pf()
 if(a.PF.value=='LAST') l=1
 else if(a.PF.value=='OFF ') l=2
 else l=0
-setVar('powerup',l)
+setVar('powerup0',l)
 pus=['LAST','OFF ',' ON ']
 a.PF.value=pus[l]
+}
+
+function pf2()
+{
+if(a.PF2.value=='LAST') l=1
+else if(a.PF2.value=='OFF ') l=2
+else l=0
+setVar('powerup1',l)
+pus=['LAST','OFF ',' ON ']
+a.PF2.value=pus[l]
 }
 
 function led1()
@@ -155,7 +182,7 @@ if(a.LED1.value=='OFF') l=1
 else if(a.LED1.value=='ON ') l=2
 else if(a.LED1.value=='LNK') l=3
 else l=0
-setVar('led1',l)
+setVar('led0',l)
 a.LED1.value=nms[l]
 a.LED1.setAttribute('style',l?'color:blue':'')
 }
@@ -165,7 +192,7 @@ if(a.LED2.value=='OFF') l=1
 else if(a.LED2.value=='ON ') l=2
 else if(a.LED2.value=='LNK') l=3
 else l=0
-setVar('led2',l)
+setVar('led1',l)
 a.LED2.value=nms[l]
 a.LED2.setAttribute('style',l?'color:blue':'')
 }
@@ -239,9 +266,9 @@ function togCall()
 
 function slide()
 {
- lvl=a.level.value
- a.LVL.value=lvl
- setVar('level',lvl)
+  lvl=a.level.value
+  a.LVL.value=lvl
+  setVar('level',lvl)
 }
 
 function setDelay()
@@ -280,7 +307,8 @@ function fillData(set)
   a.auto.value=t2hms(set.auto)
   a.CH.value=set.ch?' ON ':'OFF'
   pus=['LAST','OFF ',' ON ']
-  a.PF.value=pus[set.pu]
+  a.PF.value=pus[set.pu0]
+  a.PF2.value=pus[set.pu1]
   a.CH.setAttribute('style',set.ch?'color:red':'')
   a.watts.value=set.watt
   a.ppkw.value=set.ppkw/1000
@@ -384,19 +412,19 @@ function changeDev(dev)
   case 'ON':
     setVar('DEV',idx[1])
     v=(val=='OFF')?1:0
-    setVar('DON',v)
+    setVar('DON'+idx[2],v)
     btn=document.getElementById(dev.id)
     btn.value=nms[v]
-  btn.setAttribute('style',v?'color:red':'')
+    btn.setAttribute('style',v?'color:red':'')
     break
  }
 }
 
-// "name","192.168.0.122",mode,flags,dly
+// "name","192.168.0.122",mode,flags,dly,pwr
 function AddDev(arr)
 {
   td=document.createElement("td")
-  td.align="center"
+  td.align="left"
 
   inp=document.createElement("input")
   inp.id='DE-'+idx
@@ -440,15 +468,17 @@ function AddDev(arr)
   inp.onchange=function(){changeDev(this); }
   td.appendChild(inp)
 
+  for(i=0;i<arr[5];i++)
+  {
   inp=document.createElement("input")
-  inp.id='ON-'+idx
+  inp.id='ON-'+idx+'-'+i
   inp.type='button'
   inp.style.width='40px'
-  inp.value=nms[arr[5]]
-  inp.setAttribute('style',arr[5]?'color:red':'')
+  inp.value=nms[arr[6]&(1<<i)?1:0]
+  inp.setAttribute('style',(arr[6]&(1<<i))?'color:red':'')
   inp.onclick=function(){changeDev(this); }
   td.appendChild(inp)
-
+  }
   tr=document.createElement("tr")
   tr.id='dv'+idx
   tr.appendChild(td)
@@ -460,9 +490,9 @@ function AddDev(arr)
   idx++
 }
 
-function updateDev(dev,on,level)
+function updateDev(dev,ch,on,level)
 {
-  btn=document.getElementById('ON-'+dev)
+  btn=document.getElementById('ON-'+dev+'-'+ch)
   btn.value=nms[on]
   btn.setAttribute('style',on?'color:red':'')
 }
@@ -691,14 +721,15 @@ function draw_scale(arr,w,h,o,p,hi)
 <td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp; <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
 <td colspan=2><label for="CH">Rpt</label><input name="CH" value="OFF" type='button' onclick="{togCall()}"> Auto Off <input name="auto" type="text" value="0" size="4" onchange="setAuto();">
  &nbsp; TZ<input name="TZ" type=text size=1 value='-5' onchange="setVar('TZ', this.value);"></td></tr>
+<tr><td><input name="RLY2" value="OFF" type='button' onclick="{manual2()}"></td></tr>
 <tr>
-<td colspan=4>Start <input name="PF" value="LAST" type='button' onclick="{pf()}"> &nbsp;<input name="LVL" value="99" type='text' size="2"> &nbsp; <input type="range" id="level" name="level" min=1 max=200 onchange="slide();">
+<td colspan=4>Start <input name="PF" value="LAST" type='button' onclick="{pf()}"> <input name="PF2" value="LAST" type='button' onclick="{pf2()}"> <input name="LVL" value="99" type='text' size="2"> &nbsp; <input type="range" id="level" name="level" min=1 max=200 onchange="slide();">
 &nbsp; <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
 </table>
 <table align="right" style="font-size:small" id="list">
 <tr><td id="header" align="center"> &nbsp; Name &nbsp; &nbsp; &nbsp; &nbsp; En Su Mo Tu We Th Fr Sa On Off &nbsp; Time &nbsp; Duration Level</td></tr>
 </table>
-<table width=450 align="right" style="font-size:small" id="dev"><tr><td align="center">&#8195; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &#8195; &nbsp; Mode Dim Mt Delay &nbsp; ON </td></tr></table>
+<table width=450 align="right" style="font-size:small" id="dev"><tr align="left"><td>&#8195; &nbsp; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &#8195; &nbsp; &nbsp; Mode &nbsp; Dim Mt Delay &#8195; &nbsp; ON </td></tr></table>
 <table align="right" width=450>
 <tr><td>PPKWH<input name="ppkw" type=text size=3 onchange="setVar('ppkw',+this.value*1000);"></td><td>
 <div id="v" style="width:50px"></div></td><td>Watts<input name=watts type=text size=1 onchange="setVar('watts',this.value);">WH<input id="wh" name="wh" type=button size=8 onclick="clearWh();"> $<input id="cost" name="cost" type=button size=8 onclick="clearWh();"></td></tr>
