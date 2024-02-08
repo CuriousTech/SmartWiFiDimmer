@@ -12,16 +12,33 @@ Switch::Switch()
 
 void Switch::init(uint8_t nUserRange)
 {
-  digitalWrite(WIFI_LED, HIGH);
-  pinMode(WIFI_LED, OUTPUT);
-#ifdef TOUCH_LED
-  pinMode(TOUCH_LED, OUTPUT);
+  digitalWrite(STATUS_LED, HIGH);
+  pinMode(STATUS_LED, OUTPUT);
+#ifdef LED2
+  pinMode(LED2, OUTPUT);
 #endif
-  digitalWrite(RELAY, LOW);
-  pinMode(RELAY, OUTPUT);
+  digitalWrite(RELAY1, LOW);
+  pinMode(RELAY1, OUTPUT);
+#ifdef RELAY2
+  digitalWrite(RELAY2, LOW);
+  pinMode(RELAY2, OUTPUT);
+#endif
 #ifdef S31
   Serial.begin(4800, SERIAL_8E1);
   ee.watts = 0; // 0W when off
+#endif
+
+#ifdef NX_SP201
+  ee.watts = 0; // 0W when off
+  digitalWrite(HLWSel, _mode);
+  pinMode(HLWSel, OUTPUT);
+  pinMode(HLWCF, INPUT_PULLUP);
+  pinMode(HLWCF1, INPUT_PULLUP);
+  _calculateDefaultMultipliers();
+#endif
+  pinMode(BUTTON1, INPUT_PULLUP);
+#ifdef BUTTON2
+  pinMode(BUTTON2, INPUT_PULLUP);
 #endif
 }
 
@@ -29,6 +46,8 @@ const char *Switch::getDevice()
 {
 #ifdef S31
   return "S31";
+#elif defined(NX_SP201)
+  return "NX_SP201";
 #else
   return "SWITCH";
 #endif
@@ -39,75 +58,124 @@ uint8_t Switch::getPower(uint8_t nLevel)
   return 100;  // no reduction
 }
 
+#ifdef INT1_PIN
+void ICACHE_RAM_ATTR Switch::isr1(void)
+{
+    unsigned long now1 = micros();
+    _power_pulse_width = now1 - _last_cf_interrupt;
+    _last_cf_interrupt = now1;
+    _pulse_count++;
+}
+#endif
+
+#ifdef INT2_PIN
+void ICACHE_RAM_ATTR Switch::isr2(void)
+{
+  unsigned long now1 = micros();
+
+  if ((now1 - _first_cf1_interrupt) > PULSE_TIMEOUT)
+  {
+    unsigned long pulse_width;
+    
+    if (_last_cf1_interrupt == _first_cf1_interrupt)
+        pulse_width = 0;
+    else
+        pulse_width = now1 - _last_cf1_interrupt;
+    
+    if (_mode)
+        _voltage_pulse_width = pulse_width;
+    else
+        _current_pulse_width = pulse_width;
+    
+    _mode = !_mode;
+    digitalWrite(HLWSel, _mode);
+    _first_cf1_interrupt = now1;
+  }
+  _last_cf1_interrupt = now1;
+}
+#endif
+
 bool Switch::listen()
 {
-  static bool bNewState;
-  static bool lbState;
-  static bool bState;
-  static long debounce;
-  static long lRepeatMillis;
-  static bool bRepeat;
-  static uint8_t nRepCnt = 60; // bad fix for start issue
+  static bool bNewState[2];
+  static bool lbState[2];
+  static bool bState[2];
+  static long debounce[2];
+  static long lRepeatMillis[2];
+  static bool bRepeat[2];
+  static uint8_t nRepCnt[2] = {60, 60}; // bad fix for start issue
+  bool bInvoke[2] = {false, false};
+  bool bChange[2] = {false, false};
+
+#ifdef BUTTON2
+#define BUTTON_CNT 2
+uint8_t inpin[2] = {BUTTON1, BUTTON2};
+#else
+#define BUTTON_CNT 1
+uint8_t inpin[2] = {BUTTON1};
+#endif
 
 #define REPEAT_DELAY 300 // increase for slower repeat
 
-  bool bChange = false;
+  uint8_t i;
 
-  bNewState = digitalRead(TOUCH_IN);
-  if(bNewState != lbState)
-    debounce = millis(); // reset on state change
-
-  bool bInvoke = false;
-
-  if((millis() - debounce) > 30)
+  for(i = 0; i < BUTTON_CNT; i++)
   {
-    if(bNewState != bState) // press or release
+    bNewState[i] = digitalRead( inpin[i] );
+  
+    if(bNewState[i] != lbState[i])
+      debounce[i] = millis(); // reset on state change
+  
+  
+    if((millis() - debounce[i]) > 30)
     {
-      bState = bNewState;
-      if (bState == LOW) // pressed
+      if(bNewState[i] != bState[i]) // press or release
       {
-        lRepeatMillis = millis(); // initial increment
-        nRepCnt = 0;
-      }
-      else // release
-      {
-        if(nRepCnt)
+        bState[i] = bNewState[i];
+        if (bState[i] == LOW) // pressed
         {
-          if(nRepCnt > 50); // first is bad
-          else if(nRepCnt > 1)
-            m_bOption = true;
+          lRepeatMillis[i] = millis(); // initial increment
+          nRepCnt[i] = 0;
         }
-        else
+        else // release
         {
-          bInvoke = true;
-          bRepeat = false;
+          if(nRepCnt[i])
+          {
+            if(nRepCnt[i] > 50); // first is bad
+            else if(nRepCnt[i] > 1)
+              m_bOption = true;
+          }
+          else
+          {
+            bInvoke[i] = true;
+            bRepeat[i] = false;
+          }
+        }
+      }
+      else if(bState[i] == LOW) // holding down
+      {
+        if( (millis() - lRepeatMillis[i]) > REPEAT_DELAY * (bRepeat[i]?1:2) )
+        {
+          lRepeatMillis[i] = millis();
+          nRepCnt[i]++;
+          bRepeat[i] = true;
+  #ifdef LED2
+          bool bLed = digitalRead(LED2);
+          digitalWrite(LED2, !bLed);
+          delay(20);
+          digitalWrite(LED2, bLed);
+  #endif
         }
       }
     }
-    else if(bState == LOW) // holding down
+    if(bInvoke[i])
     {
-      if( (millis() - lRepeatMillis) > REPEAT_DELAY * (bRepeat?1:2) )
-      {
-        lRepeatMillis = millis();
-        nRepCnt++;
-        bRepeat = true;
-#ifdef TOUCH_LED
-        bool bLed = digitalRead(TOUCH_LED);
-        digitalWrite(TOUCH_LED, !bLed);
-        delay(20);
-        digitalWrite(TOUCH_LED, bLed);
-#endif
-      }
+      m_bPower[i] = !m_bPower[i];
+      bChange[i] = true;
+      setSwitch( i, m_bPower[i] ); // toggle
     }
+    lbState[i] = bNewState[i];
   }
-
-  if(bInvoke)
-  {
-    m_bPower = !m_bPower;
-    bChange = true;
-    setSwitch( m_bPower ); // toggle
-  }
-  lbState = bNewState;
 
 #ifdef S31
   if(m_fVolts == 0) // set a default before valid packets
@@ -123,7 +191,7 @@ bool Switch::listen()
   while(Serial.available())
   {
     uint8_t c = Serial.read();
-
+    
     switch(state)
     {
       case 0:
@@ -177,9 +245,8 @@ bool Switch::listen()
 
               if(m_fCurrent > 14.5) // 15A limit for S31
               {
-                m_bPower = false;
-                bChange = true;
-                setSwitch( m_bPower );
+                setSwitch( 0, false );
+                bChange[0] = true;
                 WsSend("{\"cmd\":\"alert\",\"text\":\"Current Too High\"");
               }
             }
@@ -198,6 +265,39 @@ bool Switch::listen()
   }
 #endif
 
+#ifdef NX_SP201
+
+  if(m_bPower[0] || m_bPower[1])
+  {
+    if ((micros() - _last_cf_interrupt) > PULSE_TIMEOUT)
+      m_fPower = 0;
+    else
+      m_fPower = (_power_pulse_width > 0) ? _power_multiplier / _power_pulse_width / 2 : 0;
+
+    m_fCurrent = (_current_pulse_width > 0) ? _current_multiplier / _current_pulse_width / 2 : 0;
+  }
+  else
+  {
+    m_fCurrent = 0;
+    m_fPower = 0;
+  }
+
+    if ((micros() - _last_cf1_interrupt) > PULSE_TIMEOUT)
+    {
+        if (_mode)
+            _voltage_pulse_width = 0;
+        else
+            _current_pulse_width = 0;
+
+        _mode = !_mode;
+        digitalWrite(HLWSel, _mode);
+    }
+
+  if( _voltage_pulse_width > 0)
+    m_fVolts = _voltage_multiplier / _voltage_pulse_width / 2;
+
+#endif
+
   if(m_nBlink)
   {
     static uint32_t mil;
@@ -211,10 +311,17 @@ bool Switch::listen()
   return bChange;
 }
 
-void Switch::setSwitch(bool bOn)
+void Switch::setSwitch(uint8_t n, bool bOn)
 {
-  digitalWrite(RELAY, bOn);
-  m_bPower = bOn;
+  if(n)
+  {
+#ifdef RELAY2
+    digitalWrite(RELAY2, bOn);
+#endif
+  }
+  else
+    digitalWrite(RELAY1, bOn);
+  m_bPower[n] = bOn;
 }
 
 void Switch::setLevel(uint8_t n)
@@ -227,12 +334,21 @@ void Switch::setLED(uint8_t no, bool bOn)
   switch(no)
   {
     case 0:
-      digitalWrite(WIFI_LED, bOn ? false:true); // invert for this one
+      digitalWrite(STATUS_LED, bOn ? false:true); // invert for this one
       break;
     case 1:
-#ifdef TOUCH_LED
-      digitalWrite(TOUCH_LED, bOn ? false:true); // invert for this one
+#ifdef LED2
+      digitalWrite(LED2, bOn ? false:true); // invert for this one
 #endif
       break;
   }
 }
+
+#ifdef NX_SP201
+void Switch::_calculateDefaultMultipliers()
+{
+    _current_multiplier = ( 1000000.0 * 512 * V_REF / _current_resistor / 24.0 / F_OSC );
+    _voltage_multiplier = ( 1000000.0 * 512 * V_REF * _voltage_resistor / 2.0 / F_OSC );
+    _power_multiplier = ( 1000000.0 * 128 * V_REF * V_REF * _voltage_resistor / _current_resistor / 48.0 / F_OSC );
+}
+#endif
