@@ -6,6 +6,8 @@
 
 #define SWITCH_IN 13
 
+extern void WsSend(String s);
+
 Module::Module()
 {
   pinMode(SWITCH_IN, INPUT);
@@ -27,6 +29,10 @@ uint8_t Module::getPower(uint8_t nLevel)
   return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
+void Module::isr()
+{
+}
+
 bool Module::listen()
 {
   // handle 60Hz AC switch input (low pulse while pressed)
@@ -43,9 +49,9 @@ bool Module::listen()
     {
       if(nDirection == 0) // set direction
       {
-        if(m_bPower == false)
+        if(m_bPower[0] == false)
         {
-          m_bPower = true;
+          m_bPower[0] = true;
           bChange = true;
         }
         if(m_nLightLevel < m_nUserRange)
@@ -69,7 +75,7 @@ bool Module::listen()
   {
     if(cnt <= 4) // short tap (~100ms)
     {
-      m_bPower = !m_bPower;
+      m_bPower[0] = !m_bPower[0];
       bChange = true;
     }
     cnt = 0;
@@ -82,14 +88,14 @@ bool Module::listen()
   {
     ls = s;
     uint8_t level = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
-    writeSerial( m_bPower ? level : 0);
+    writeSerial( m_bPower[0] ? level : 0);
   }
   return bChange;
 }
 
-void Module::setSwitch(bool bOn)
+void Module::setSwitch(uint8_t idx, bool bOn)
 {
-  m_bPower = bOn;
+  m_bPower[0] = bOn;
 }
 
 bool Module::writeSerial(uint8_t level)
