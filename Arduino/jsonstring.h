@@ -238,7 +238,7 @@ public:
     m_cnt++;
   }
 
-  void Array(const char *key, Device dev[], DevState devst[], int n)
+  void Array(const char *key, Device dev[], DevState devst[], uint8_t n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -253,7 +253,10 @@ public:
       s += "\",";  s += dev[i].mode;
       s += ","; s += dev[i].flags;
       s += ","; s += dev[i].delay;
-      s += ","; s += devst[i].bPwr;
+      if(dev[i].chns == 0) // backward compat
+        dev[i].chns = 1;
+      s += ","; s += dev[i].chns;
+      s += ","; s += (devst[i].bPwr[0] | (devst[i].bPwr[1] << 1) );
       s += ","; s += devst[i].nLevel;
       s += "]";
     }
