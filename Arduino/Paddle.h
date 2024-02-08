@@ -12,13 +12,13 @@ public:
   bool listen(void);
   void init(uint8_t nUserRange);
   const char *getDevice(void);
-  void setSwitch(bool bOn);
+  void setSwitch(uint8_t idx, bool bOn);
   void setLevel(void);
   void setLevel(uint8_t level);
   void setLED(uint8_t no, bool bOn);
   uint8_t getPower(uint8_t nLevel);
 
-  bool    m_bPower;      // state
+  bool    m_bPower[2];      // state
   bool    m_bLED[2];
   uint8_t m_nLightLevel = 50; // current level
   const uint8_t nLevelMin = 10;
