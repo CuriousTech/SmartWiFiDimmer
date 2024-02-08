@@ -3,10 +3,10 @@
 
 #include "Paddle.h"
 #include <TimeLib.h>
-#include <UdpTime.h>
+//#include <UdpTime.h>
 #include "eeMem.h"
 
-extern UdpTime utime;
+//extern UdpTime utime;
 
 void Paddle::init(uint8_t nRange)
 {
@@ -44,9 +44,9 @@ bool Paddle::listen()
       if((p = strstr(inBuffer, "switch")) != NULL) // "switch":"on"
       {
         bool b = (p[10] == 'n') ? true:false; // on or off
-        if(m_bPower != b)
+        if(m_bPower[0] != b)
           bChange = true;
-        m_bPower = b;
+        m_bPower[0] = b;
       }
       if((p = strstr(inBuffer, "bright")) != NULL) // "bright":99
       {
@@ -81,23 +81,23 @@ bool Paddle::listen()
   return bChange;
 }
 
-void Paddle::setSwitch(bool bOn)
+void Paddle::setSwitch(uint8_t idx, bool bOn)
 {
   String s;
   s = "AT+UPDATE=\"sequence\":\"";
-  s += (now() - ( (ee.tz + utime.getDST() ) * 3600)*1000) + millis();
+  s += (now() - ( (ee.tz ) * 3600)*1000) + millis();
   s += "\",\"switch\":\"";
   s += (bOn)? "on" : "off";
   s += "\"\x1B";
   Serial.write((uint8_t*)s.c_str(), s.length());
-  m_bPower = bOn;
+  m_bPower[0] = bOn;
 }
 
 void Paddle::setLevel()
 {
   String s;
   s = "AT+UPDATE=\"sequence\":\"";
-  s += (now() - ( (ee.tz + utime.getDST() ) * 3600)*1000) + millis();
+  s += (now() - ( (ee.tz ) * 3600)*1000) + millis();
   s += "\",\"bright\":";
   s += constrain(m_nLightLevel, nLevelMin, nLevelMax);
   s += "\x1B";
