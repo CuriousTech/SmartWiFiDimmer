@@ -24,9 +24,9 @@ const char *Module::getDevice()
   return "DIMMER_CUBE";
 }
 
-uint8_t Module::getPower(uint8_t nLevel)
+uint8_t Module::getPower()
 {
-  return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
+  return map(m_nLightLevel[0], 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
 void Module::isr()
@@ -54,20 +54,20 @@ bool Module::listen()
           m_bPower[0] = true;
           bChange = true;
         }
-        if(m_nLightLevel < m_nUserRange)
+        if(m_nLightLevel[0] < m_nUserRange)
             nDirection = 1; // up
         else
             nDirection = 2; // down
       }
       if(nDirection == 1) // up
       {
-        if(m_nLightLevel < m_nUserRange)
-          m_nLightLevel++;
+        if(m_nLightLevel[0] < m_nUserRange)
+          m_nLightLevel[0]++;
       }
       else // down
       {
-        if(m_nLightLevel > 1)
-          m_nLightLevel--;
+        if(m_nLightLevel[0] > 1)
+          m_nLightLevel[0]--;
       }
     }
   }
@@ -87,7 +87,7 @@ bool Module::listen()
   if(s != ls) // Set new light value every second
   {
     ls = s;
-    uint8_t level = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
+    uint8_t level = map(m_nLightLevel[0], 1, m_nUserRange, nLevelMin, nLevelMax);
     writeSerial( m_bPower[0] ? level : 0);
   }
   return bChange;
@@ -112,9 +112,9 @@ bool Module::writeSerial(uint8_t level)
   return Serial.write(buf, 6);
 }
 
-void Module::setLevel(uint8_t n)
+void Module::setLevel(uint8_t idx, uint8_t n)
 {
-  m_nNewLightLevel = constrain(n, 1, m_nUserRange);
+  m_nLightLevel[0] = constrain(n, 1, m_nUserRange);
 }
 
 void Module::setLED(uint8_t no, bool bOn)
