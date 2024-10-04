@@ -1,5 +1,3 @@
-#include "eeMem.h"
-
 class jsonString
 {
 public:
@@ -257,7 +255,8 @@ public:
         dev[i].chns = 1;
       s += ","; s += dev[i].chns;
       s += ","; s += (devst[i].bPwr[0] | (devst[i].bPwr[1] << 1) );
-      s += ","; s += devst[i].nLevel;
+      s += ","; s += devst[i].nLevel[0];
+      s += ","; s += devst[i].nLevel[1];
       s += "]";
     }
     s += "]";
