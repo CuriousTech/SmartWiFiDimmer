@@ -48,12 +48,14 @@ const char *Switch::getDevice()
   return "S31";
 #elif defined(NX_SP201)
   return "NX_SP201";
+#elif defined(THREEWAY)
+  return "3WAY";
 #else
   return "SWITCH";
 #endif
 }
 
-uint8_t Switch::getPower(uint8_t nLevel)
+uint8_t Switch::getPower()
 {
   return 100;  // no reduction
 }
@@ -282,20 +284,27 @@ uint8_t inpin[2] = {BUTTON1};
     m_fPower = 0;
   }
 
-    if ((micros() - _last_cf1_interrupt) > PULSE_TIMEOUT)
-    {
-        if (_mode)
-            _voltage_pulse_width = 0;
-        else
-            _current_pulse_width = 0;
+  if ((micros() - _last_cf1_interrupt) > PULSE_TIMEOUT)
+  {
+      if (_mode)
+          _voltage_pulse_width = 0;
+      else
+          _current_pulse_width = 0;
 
-        _mode = !_mode;
-        digitalWrite(HLWSel, _mode);
-    }
+      _mode = !_mode;
+      digitalWrite(HLWSel, _mode);
+  }
 
   if( _voltage_pulse_width > 0)
     m_fVolts = _voltage_multiplier / _voltage_pulse_width / 2;
 
+#endif
+
+#ifdef THREEWAY
+  if(m_bPower[0] == digitalRead(THREEWAY) ) // Aida is low for on
+  {
+    m_bPower[0] = !m_bPower[0];
+  }
 #endif
 
   if(m_nBlink)
@@ -320,11 +329,15 @@ void Switch::setSwitch(uint8_t n, bool bOn)
 #endif
   }
   else
+#ifdef THREEWAY
+    digitalWrite(RELAY1, !digitalRead(RELAY1)); // 3-way uses a SPDT relay
+#else
     digitalWrite(RELAY1, bOn);
-  m_bPower[n] = bOn;
+    m_bPower[n] = bOn;
+#endif
 }
 
-void Switch::setLevel(uint8_t n)
+void Switch::setLevel(uint8_t n, uint8_t level)
 {
 }
 
