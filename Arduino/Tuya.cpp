@@ -10,9 +10,9 @@
 //#define GEENI // https://mygeeni.com/products/tap-dim-smart-wi-fi-dimmer-switch-white (Mine has no blue and green LEDs, maybe old model)
 //#define MOES1  // https://www.amazon.com/MOES-Replaces-Multi-Control-Required-Compatible/dp/B08NJKSKRJ/ref=sr_1_12?m=AM2ATWLFGFUBV&qid=1639721132&s=merchant-items&sr=1-12
 //#define MOES2 // v1.1 uses main serial and 104-1000 for level
-//#define MOES3 // EDM-1WAA-US KER_V1.0 Uses main serial, 115200 baud and 10-1000 for level
-#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
-//#define GLASS // Avatar maybe? https://www.sears.com/avatar-controls-smart-wifi-dimmer-switch-wall-light/p-A074841312
+#define MOES3 // EDM-1WAA-US KER_V1.0 Uses main serial, 115200 baud and 10-1000 for level
+//#define WIRED // Wired module (FOXNSK): https://www.amazon.com/Dimmer-Switch-FOXNSK-Wireless-Compatible/dp/B07Q2XSYHS
+//#define GLASS // Avatar maybe? https://www.aliexpress.us/item/3256805580530574.html?src=google&gatewayAdapt=glo2usa
 
 #if defined(GEENI) || defined (MOES3)
 #define BAUD 115200
@@ -28,6 +28,8 @@
 #define BAUD 9600
 #define DIM_CMD 2 // 2 for Geeni, glass, wired, and MOES3
 #endif
+
+extern void WsSend(String s);
 
 Tuya::Tuya()
 {
@@ -45,14 +47,14 @@ Tuya::Tuya()
 void Tuya::init(uint8_t nUserRange)
 {
  m_nUserRange = nUserRange;
- m_nLightLevel = m_nNewLightLevel = m_nUserRange / 2; // set in a callback
+ m_nLightLevel[0] = m_nNewLightLevel = m_nUserRange / 2; // set in a callback
 #ifdef WIFI_LED
   digitalWrite(WIFI_LED, LOW);
   pinMode(WIFI_LED, OUTPUT);
 #endif
   Serial.begin(BAUD);
 #ifdef MOES1
-  Serial.swap(); // MOES v1.0 uses alt serial
+//  Serial.swap(); // MOES v1.0 uses alt serial
 #endif
   checkStatus();
 }
@@ -82,9 +84,9 @@ void Tuya::checkStatus()
   m_cs = 15;
 }
 
-uint8_t Tuya::getPower(uint8_t nLevel)
+uint8_t Tuya::getPower()
 {
-  return map(nLevel, 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
+  return map(m_nLightLevel[0], 0, m_nUserRange, nWattMin, 100);  // 1% = about 60% power
 }
 
 bool Tuya::listen()
@@ -162,10 +164,12 @@ bool Tuya::listen()
                     bChange = false;
                     break;
                   case 8: // 03 02 00 04 00 ?? lvlH lvlL
+#ifndef WIRED // the wired one sends back levels as it fades up/down. Annoying!
                     lvl = (inBuffer[6] << 8) | inBuffer[7];
                     if(lvl < nLevelMin) lvl = nLevelMin;
-                    m_nNewLightLevel = m_nLightLevel =
+                    m_nNewLightLevel = m_nLightLevel[0] =
                       map(lvl, nLevelMin, nLevelMax, 1, m_nUserRange);
+#endif
                     break;
                   default:
                     break;
@@ -181,9 +185,9 @@ bool Tuya::listen()
     }
   }
 
-  if(m_nNewLightLevel != m_nLightLevel) // new requested level
+  if(state == 0 && m_nNewLightLevel != m_nLightLevel[0]) // new requested level (only send when idle!)
   {
-    m_nLightLevel = m_nNewLightLevel;
+    m_nLightLevel[0] = m_nNewLightLevel;
     setLevel();
   }
 
@@ -225,8 +229,8 @@ void Tuya::setLevel()
   data[1] = 2; // value type
   data[2] = 0;
   data[3] = 4; // 4 byte value
-  uint16_t lvl = map(m_nLightLevel, 1, m_nUserRange, nLevelMin, nLevelMax);
   data[4] = 0;
+  uint16_t lvl = map(m_nLightLevel[0], 1, m_nUserRange, nLevelMin, nLevelMax);
   data[5] = 0;
   data[6] = lvl >> 8;
   data[7] = lvl & 0xFF;
@@ -255,26 +259,30 @@ bool Tuya::writeSerial(uint8_t cmd, uint8_t *p, uint16_t len)
   return Serial.write(buf, 7 + len);
 }
 
-void Tuya::setLevel(uint8_t n)
+void Tuya::setLevel(uint8_t idx, uint8_t level)
 {
-  m_nNewLightLevel = constrain(n, 1, m_nUserRange);
+  m_nNewLightLevel = constrain(level, 1, m_nUserRange);
 }
+
+// MOES3 0=fast blink, 1=slow blink, 2=off, 3 or 4=white on?
 
 void Tuya::setLED(uint8_t no, bool bOn)
 {
+  m_bLED[no] = bOn;
+
 #if defined(MOES1) || defined(MOES2) || defined(MOES3)
   uint8_t data[1]; // 0 = no WiFi
-  m_bLED[no] = bOn;
+  
   if(m_bLED[0] == 0 && m_bLED[1] == 0)
     data[0] = 3; // white glow
   else if(m_bLED[0])
     data[0] = 2; // red
   else if(m_bLED[1])
     data[0] = 1; // red blink
+
   writeSerial(3, data, 1);
 #endif
 #ifdef WIFI_LED
-  m_bLED[no] = bOn;
   if(no == 0)
     digitalWrite(WIFI_LED, bOn);
 #endif
