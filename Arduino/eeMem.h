@@ -2,6 +2,7 @@
 #define EEMEM_H
 
 #include <Arduino.h>
+#include <ESPAsyncWebServer.h>
 
 enum Enable_bits
 {
@@ -40,25 +41,37 @@ enum DEV_MODE{
   DM_REV,
 };
 
+enum LED_MODE{
+  LM_OFF,
+  LM_ON,
+  LM_LNK,
+  LM_REV,
+  LM_MOT,
+};
+
+
+#define DC_LNK 1 // device control flags
+#define DC_DIM 2
+#define DC_MOT 4
+
 struct Device
 {
-  char szName[32];
-  uint8_t IP[4];
+  char     szName[32];
+  uint8_t  IP[4];
   uint16_t delay;
-  uint8_t mode; // DEV_MODE
-  uint8_t flags; // DEV_FLAGS
-  uint8_t chns; // channels
+  uint8_t  mode; // DEV_MODE
+  uint8_t  flags; // DEV_FLAGS
+  uint8_t  chns; // channels
 }; // 42
 
 struct DevState
 {
-  uint8_t nLevel;
-  uint8_t nLevelS;
+  uint8_t nLevel[2];
   uint32_t tm;
-  bool bChanged;
+  bool    bChanged;
   uint8_t cmd;
-  bool bPwr[4];
-  bool bPwrS[4];
+  bool    bPwr[4];
+  bool    bPwrS[4];
 };
 
 struct Energy
@@ -69,14 +82,16 @@ struct Energy
 
 struct flags_t
 {
-  uint16_t call:1;
-  uint16_t lightOn0:1;
-  uint16_t lightOn1:1;
-  uint16_t start0:3;
-  uint16_t start1:3;
-  uint16_t led0:2;
-  uint16_t led1:2;
-  uint16_t res:3;
+  uint32_t call:1;
+  uint32_t lightOn0:1;
+  uint32_t lightOn1:1;
+  uint32_t start0:3;
+  uint32_t start1:3;
+  uint32_t led0:3;
+  uint32_t led1:3;
+  uint32_t led2:3;
+  uint32_t led3:3;
+  uint32_t useNtp:1;
 };
 
 #define EESIZE (offsetof(eeMem, end) - offsetof(eeMem, size) )
@@ -84,26 +99,25 @@ struct flags_t
 class eeMem
 {
 public:
-  eeMem();
+  eeMem(){};
+  void init(void);
   void update(void);
 private:
   uint16_t Fletcher16( uint8_t* data, int count);
 public:
   uint16_t size = EESIZE;          // if size changes, use defaults
   uint16_t sum = 0xAAAA;           // if sum is diiferent from memory struct, write
-  char     szSSID[32] = ""; // Enter your SSID here
+  char     szSSID[32] = "";  // see #define USER_SSID for default
   char     szSSIDPassword[64] = ""; // and SSID password
   char     szName[28] = "BackLight"; // Device/OTA name
   uint8_t  hostIP[4] = {192,168,31,100}; // Control/status hub
   uint16_t hostPort = 80;
   uint8_t  controlIP[4] = {192,168,31,191}; // A secondary controller
   uint16_t controlPort = 80;
-  int8_t   tz = -5;
-  bool     bUseNtp;
-  uint16_t watts = 7;  // Fixed watts of devices without metering
+  uint16_t watts = 5;  // Fixed watts of devices without metering
   uint16_t ppkw = 150;  // 15.0 cents/KWH
-  uint8_t  motionPin[2] = {0, 0};   // Basement=14, Back switch=14
-  uint8_t  nLightLevel = 100; // 50%
+  uint8_t  motionPin[2] = {0, 0};   // 14 everywhere
+  uint8_t  nLightLevel[2] = {50, 0}; // 50%
   flags_t  flags1 = {0};
   char     szControlPassword[32] = "password"; // password for WebSocket and HTTP params
   uint32_t autoTimer;
@@ -111,16 +125,18 @@ public:
   float    fTotalWatts;
   uint32_t nTotalSeconds;
   uint32_t nTotalStart;
+  uint8_t nPresenceDelay = 0; // mmWave non-presence gap (0 = PIR)
+  uint8_t res1;
   Sched    schedule[MAX_SCHED] =  // 30*28
-  {
-    {  6*60,  10*60, 254, 100, "Morning"},  // time, seconds, wday, level, name
+  { // time, seconds, wday, level, name
+    {  6*60,  10*60, 254, 100, "Morning"}, 
     { 12*60,  60*60, 254, 200, "Lunch"},
     { 14*60, 120*60, 254, 20, "Something"},
   };
   Device  dev[MAX_DEV];
-  Energy  days[31]; // 248 the esp-07 EEPROM seems to be smaller than ESP-12?
+  Energy  days[31]; // 248
   Energy  months[12]; // 96
-  uint8_t res[32];
+  uint8_t res2[36];
   uint8_t end; // marker for EEPROM data size and end
 }; // 2272 + Energy = 2653
 
