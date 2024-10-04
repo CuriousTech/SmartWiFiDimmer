@@ -12,12 +12,12 @@ public:
   void isr(void);
   const char *getDevice(void);
   void setSwitch(uint8_t idx, bool bOn);
-  void setLevel(uint8_t level);
+  void setLevel(uint8_t idx, uint8_t level);
   void setLED(uint8_t no, bool bOn);
-  uint8_t getPower(uint8_t nLevel);
+  uint8_t getPower(void);
   bool    m_bPower[2];      // state
-  bool    m_bLED[2];
-  uint8_t m_nLightLevel = 100; // current level
+  bool    m_bLED[4];
+  uint8_t m_nLightLevel[2] = {100, 0}; // current level
   float   m_fVolts;
   float   m_fCurrent;
   float   m_fPower;
@@ -30,7 +30,6 @@ public:
 private:
   bool writeSerial(uint8_t level);
 
-  uint8_t m_nNewLightLevel = 100; // set in a callback
   uint8_t m_nUserRange = 200;
 };
 
