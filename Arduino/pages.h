@@ -19,7 +19,7 @@ body{width:470px;display:block;margin-left:auto;margin-right:auto;text-align:rig
 <script type="text/javascript">
 a=document.all
 idx=0
-nms=['OFF','ON ','LNK','REV']
+nms=['OFF','ON ','LNK','REV','MOT']
 dys=[['Sun'],['Mon'],['Tue'],['Wed'],['Thu'],['Fri'],['Sat']]
 maxW=1
 wArr=[]
@@ -33,7 +33,7 @@ $(document).ready(function(){
 
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.31.111/ws")
+//ws=new WebSocket("ws://192.168.31.70/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -42,31 +42,52 @@ console.log(evt.data)
  if(d.cmd=='state'){
   d2=new Date(d.t*1000)
   a.time.innerHTML=dys[d2.getDay()]+' '+d2.toLocaleTimeString()+' T:'+t2hms(d.tr)
-  a.RLY.value=nms[d.on0]
-  a.RLY.setAttribute('style',d.on0?'color:red':'')
+  a.RLY0.value=nms[d.on0]
+  a.RLY0.setAttribute('style',d.on0?'color:red':'')
   if(d.on1!=undefined)
   {
-    a.RLY2.value=nms[d.on1]
-    a.RLY2.setAttribute('style',d.on1?'color:red':'')
+    a.RLY1.value=nms[d.on1]
+    a.RLY1.setAttribute('style',d.on1?'color:red':'')
   }
   else{
-    a.RLY2.style.visibility='hidden'
+    a.RLY1.style.visibility='hidden'
     a.PF2.style.visibility='hidden'
+    a.LED3.style.visibility='hidden'
+    a.LED4.style.visibility='hidden'
+    a.LVL1.style.visibility='hidden'
   }
   a.LED1.value=nms[d.l0]
   a.LED1.setAttribute('style',d.l0?'color:blue':'')
   a.LED2.value=nms[d.l1]
   a.LED2.setAttribute('style',d.l1?'color:blue':'')
-  a.LVL.value=d.lvl
-  a.level.value=d.lvl
-  a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()
-  if(d.lvl==0)
+  if(d.l2!=undefined)
   {
-   a.LVL.style.visibility='hidden'
-   a.level.style.visibility='hidden'
+    a.LED3.value=nms[d.l2]
+    a.LED3.setAttribute('style',d.l2?'color:blue':'')
+  }
+  if(d.l3!=undefined)
+  {
+    a.LED4.value=nms[d.l3]
+    a.LED4.setAttribute('style',d.l3?'color:blue':'')
+  }
+  a.LVL0.value=d.lvl0
+  a.level0.value=d.lvl0
+  a.ts.innerHTML=t2hms(d.ts)+' &nbsp; Since ' + (new Date(d.st*1000)).toLocaleString()
+  if(d.lvl0==0)
+  {
+   a.LVL0.style.visibility='hidden'
+   a.level0.style.visibility='hidden'
    a.header.innerHTML=' &nbsp Name &nbsp &nbsp &nbsp &nbsp En Su Mo Tu We Th Fr Sa On Off &nbsp Time &nbsp Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; '
   }
-  a.MOT.setAttribute('bgcolor',d.mo0?'red':'')
+  if(d.lvl1==undefined)
+  {
+    a.LVL1.style.visibility='hidden'
+    a.level1.style.visibility='hidden'
+  }
+  else{
+    a.LVL1.value=d.lvl1
+    a.level1.value=d.lvl1
+  }
   if(d.sn) document.getElementById('r'+(d.sn-1)).setAttribute('bgcolor','red')
  }
  else if(d.cmd=='energy')
@@ -139,21 +160,22 @@ console.log(evt.data)
 }
 function setVar(varName, value)
 {
+ console.log( '{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}' )
  ws.send('{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
 }
 function manual()
 {
-on=(a.RLY.value=='OFF')
+on=(a.RLY0.value=='OFF')
 setVar('pwr0',on)
-a.RLY.value=on?'ON ':'OFF'
-a.RLY.setAttribute('style',on?'color:red':'')
+a.RLY0.value=on?'ON ':'OFF'
+a.RLY0.setAttribute('style',on?'color:red':'')
 }
 function manual2()
 {
-on=(a.RLY2.value=='OFF')
+on=(a.RLY1.value=='OFF')
 setVar('pwr1',on)
-a.RLY2.value=on?'ON ':'OFF'
-a.RLY2.setAttribute('style',on?'color:red':'')
+a.RLY1.value=on?'ON ':'OFF'
+a.RLY1.setAttribute('style',on?'color:red':'')
 }
 
 function pf()
@@ -176,25 +198,17 @@ pus=['LAST','OFF ',' ON ']
 a.PF2.value=pus[l]
 }
 
-function led1()
+function led(n)
 {
-if(a.LED1.value=='OFF') l=1
-else if(a.LED1.value=='ON ') l=2
-else if(a.LED1.value=='LNK') l=3
+item=document.getElementById('LED'+(n+1))
+if(item.value=='OFF') l=1
+else if(item.value=='ON ') l=2
+else if(item.value=='LNK') l=3
+else if(item.value=='REV') l=4
 else l=0
-setVar('led0',l)
-a.LED1.value=nms[l]
-a.LED1.setAttribute('style',l?'color:blue':'')
-}
-function led2()
-{
-if(a.LED2.value=='OFF') l=1
-else if(a.LED2.value=='ON ') l=2
-else if(a.LED2.value=='LNK') l=3
-else l=0
-setVar('led1',l)
-a.LED2.value=nms[l]
-a.LED2.setAttribute('style',l?'color:blue':'')
+setVar('led'+n,l)
+item.value=nms[l]
+item.setAttribute('style',l?'color:blue':'')
 }
 
 function t2hms(t)
@@ -264,11 +278,25 @@ function togCall()
   else setVar('ch',0)
 }
 
-function slide()
+function setNtp()
 {
-  lvl=a.level.value
-  a.LVL.value=lvl
-  setVar('level',lvl)
+  on=(a.NTP.value=='OFF')?1:0
+  setVar('NTP', on)
+  a.NTP.value=nms[on]
+  a.NTP.setAttribute('style',on?'color:red':'')
+}
+
+function slide0()
+{
+  lvl=a.level0.value
+  a.LVL0.value=lvl
+  setVar('level0',lvl)
+}
+function slide1()
+{
+  lvl=a.level1.value
+  a.LVL1.value=lvl
+  setVar('level1',lvl)
 }
 
 function setDelay()
@@ -286,6 +314,11 @@ function setMTime()
   setVar('MOT',hms2t(a.mtime.value))
 }
 
+function setPD()
+{
+  setVar('pd',hms2t(a.pd.value))
+}
+
 function clearWh()
 {
   setVar('rt',0)
@@ -300,10 +333,11 @@ function changeNm()
 
 function fillData(set)
 {
-  a.TZ.value=set.tz
+  a.NTP.value=set.ntp?' ON ':'OFF'
   a.nm.value=set.name
   document.title=set.name
   a.mtime.value=t2hms(set.mot)
+  a.pd.value=t2hms(set.pd)
   a.auto.value=t2hms(set.auto)
   a.CH.value=set.ch?' ON ':'OFF'
   pus=['LAST','OFF ',' ON ']
@@ -436,10 +470,11 @@ function AddDev(arr)
 
   inp=document.createElement("button")
   inp.id='IP-'+idx
-  inp.border=1
-  inp.style.width='105px'
+//  inp.border=1
+  inp.style.width='0px' // 105
   inp.type='text'
   inp.innerHTML=arr[1]
+  inp.style.visibility='hidden'
   td.appendChild(inp)
 
   inp=document.createElement("input")
@@ -716,27 +751,32 @@ function draw_scale(arr,w,h,o,p,hi)
 </head>
 <body bgcolor="silver">
 <table align="right" width=450>
-<tr><td>Power</td><td>LED1 &nbsp; LED2</td><td><input id="nm" type=text size=8 onchange="changeNm();"></td><td><div id="time"></div></td></tr>
-<tr><td><input name="RLY" value="OFF" type='button' onclick="{manual()}"></td>
-<td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp; <input name="LED2" value="OFF" type='button' onclick="{led2()}"></td>
-<td colspan=2><label for="CH">Rpt</label><input name="CH" value="OFF" type='button' onclick="{togCall()}"> Auto Off <input name="auto" type="text" value="0" size="4" onchange="setAuto();">
- &nbsp; TZ<input name="TZ" type=text size=1 value='-5' onchange="setVar('TZ', this.value);"></td></tr>
-<tr><td><input name="RLY2" value="OFF" type='button' onclick="{manual2()}"></td></tr>
+<tr><td colspan="2" align="left"><input id="nm" type=text size=8 onchange="changeNm();"> &nbsp;  &nbsp; &nbsp; <label for="CH">Rpt</label><input name="CH" value="OFF" type='button' onclick="{togCall()}"></></td><td colspan="2"> <div id="time"></div></td></tr>
+<tr><td>Power &nbsp; Start</td><td>LED1 &nbsp; LED2</td><td colspan="2">Auto Off <input name="auto" type="text" value="0" size="4" onchange="setAuto();">
+ &nbsp; NTP<input name="NTP" type='button' value='OFF' onclick="{setNtp()}"></td></tr>
+<tr><td><input name="RLY0" value="OFF" type='button' onclick="{manual()}"> <input name="PF" value="LAST" type='button' onclick="{pf()}"></td>
+<td><input id="LED1" value="OFF" type='button' onclick="{led(0)}"> <input id="LED2" value="OFF" type='button' onclick="{led(1)}"></td>
+<td colspan=2> <input name="LVL0" value="99" type='text' size="2"> &nbsp; <input type="range" id="level0" name="level0" min=1 max=200 onchange="slide0();"> </td></tr>
+<tr><td><input name="RLY1" value="OFF" type='button' onclick="{manual2()}"> <input name="PF2" value="LAST" type='button' onclick="{pf2()}"></td>
+<td><input id="LED3" value="OFF" type='button' onclick="{led(2)}"> <input id="LED4" value="OFF" type='button' onclick="{led(3)}"></td>
+<td><input name="LVL1" value="99" type='text' size="2"> &nbsp; <input type="range" id="level1" name="level1" min=1 max=200 onchange="slide1();"></tr>
 <tr>
-<td colspan=4>Start <input name="PF" value="LAST" type='button' onclick="{pf()}"> <input name="PF2" value="LAST" type='button' onclick="{pf2()}"> <input name="LVL" value="99" type='text' size="2"> &nbsp; <input type="range" id="level" name="level" min=1 max=200 onchange="slide();">
-&nbsp; <input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
+<td colspan=2></td><td><input name="dly" type="text" value="0" size="4"><input value="Delay On" type='button' onclick="{setDelay()}"></td></tr>
+<tr>
+<td colspan=3> </td><td></td></tr>
 </table>
 <table align="right" style="font-size:small" id="list">
 <tr><td id="header" align="center"> &nbsp; Name &nbsp; &nbsp; &nbsp; &nbsp; En Su Mo Tu We Th Fr Sa On Off &nbsp; Time &nbsp; Duration Level</td></tr>
 </table>
-<table width=450 align="right" style="font-size:small" id="dev"><tr align="left"><td>&#8195; &nbsp; Name &#8195; &#8195; &nbsp; &nbsp; IP Address &#8195; &nbsp; &nbsp; Mode &nbsp; Dim Mt Delay &#8195; &nbsp; ON </td></tr></table>
+<table width=450 align="right" style="font-size:small" id="dev"><tr align="left"><td>&#8195; &nbsp; Name &#8195; &#8195; &nbsp; &nbsp; &nbsp; Mode &nbsp; Dim Mt Delay &#8195; &nbsp; ON </td></tr></table>
 <table align="right" width=450>
-<tr><td>PPKWH<input name="ppkw" type=text size=3 onchange="setVar('ppkw',+this.value*1000);"></td><td>
+<tr><td>PPKWH<input name="ppkw" type=text size=2 onchange="setVar('ppkw',+this.value*1000);"></td><td>
 <div id="v" style="width:50px"></div></td><td>Watts<input name=watts type=text size=1 onchange="setVar('watts',this.value);">WH<input id="wh" name="wh" type=button size=8 onclick="clearWh();"> $<input id="cost" name="cost" type=button size=8 onclick="clearWh();"></td></tr>
 <tr><td><div id="rssi">0db</div></td><td colspan=2><div id="ts">1:00:00</div></td></tr>
-<tr><td id="MOT">Motion<input name="mtime" type=text size=4 style="width: 60px" onchange="setMTime();"></td><td colspan=2>
+<tr><td id="MOT">Presence<input name="mtime" type=text size=4 style="width: 40px" onchange="setMTime();"></td><td colspan=2>
+Idle<input name="pd" type=text size=4 style="width: 40px" onchange="setPD();"> &nbsp; 
  <input value='Restart' type=button onclick="setVar('reset',0);"> &nbsp; 
- <input id="myKey" name="key" type=text size=50 placeholder="password" style="width: 128px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}">
+ <input id="myKey" name="key" type=text size=45 placeholder="password" style="width: 100px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}">
 </td></tr>
 </table>
 <table align="right" width=450>
