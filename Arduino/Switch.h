@@ -3,9 +3,12 @@
 
 #include <Arduino.h>
 
-// Uncomment one for S31 or other current sensor models
+// Uncomment only one (or leave all commented for basic)
 //#define S31
-//#define NX_SP201 // (HLW8012 sensor)
+#define NX_SP201 // (HLW8012 sensor)
+//#define THREEWAY  15 // Aida 3-way switch modded with ESP12E. Pin 15 is state. low = on
+
+#define ESP_LED   2   // ESP-12 low = blue LED on
 
 #ifdef S31
 #define BUTTON1     0  // side button
@@ -17,15 +20,13 @@
 #define HLWCF      4
 #define HLWCF1     5
 #define STATUS_LED 9  //blue LED
-#define RELAY1    10
-#define BUTTON2   12
-#define RELAY2    13
-#define BUTTON1   14
-#define INT1_PIN   HLWCF
-#define INT2_PIN   HLWCF1
+#define RELAY2    10
+#define BUTTON1   12
+#define RELAY1    13
+#define BUTTON2   14
 
 #else // most basic switches
-#define STATUS_LED 4  // top red LED (on low)
+#define STATUS_LED 4  // top red LED (low = on)
 #define LED2       5  // Circle LED (low = on)
 #define RELAY1    12  // Relay (high = on)
 #define BUTTON1   13  // Touch switch input (low = press)
@@ -43,17 +44,17 @@ public:
   bool listen(void);
   void init(uint8_t nUserRange);
   void setSwitch(uint8_t n, bool bOn);
-  void setLevel(uint8_t level);
+  void setLevel(uint8_t n, uint8_t level);
   const char *getDevice(void);
   void  setLED(uint8_t no, bool bOn);
-  uint8_t getPower(uint8_t nLevel);
-  void ICACHE_RAM_ATTR isr1(void);
-  void ICACHE_RAM_ATTR isr2(void);
+  uint8_t getPower(void);
+  void IRAM_ATTR isr1(void);
+  void IRAM_ATTR isr2(void);
   bool   m_bPower[2];      // power state
   float  m_fPower;
   float  m_fCurrent;
   float  m_fVolts = 0; // 0 = no monitor
-  int8_t m_nLightLevel = 0; // current level (0=switch)
+  uint8_t m_nLightLevel[2] = {0,0}; // current level (0=switch)
   bool   m_bOption;
 
 private:
